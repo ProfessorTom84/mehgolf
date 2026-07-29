@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meh Golf</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAF8F2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%2324262B'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ============ MENU SCREEN ============ -->
+<section id="menu" class="screen">
+  <div class="menu-card">
+    <header class="masthead">
+      <div class="masthead-rule"></div>
+      <h1>MEH&nbsp;GOLF</h1>
+      <p class="tagline">a paper golf notebook, digitized</p>
+      <div class="masthead-rule"></div>
+    </header>
+
+    <div class="menu-form">
+      <div class="field">
+        <label for="seed-input">Course seed</label>
+        <div class="seed-row">
+          <input id="seed-input" type="text" maxlength="24" spellcheck="false" autocomplete="off">
+          <button id="shuffle-seed" class="btn ghost" title="New random seed" aria-label="New random seed">&#8635;</button>
+        </div>
+        <p class="hint">Share a seed with a friend to play the exact same 18 holes.</p>
+      </div>
+
+      <div class="field">
+        <label>Players</label>
+        <div id="player-picker" class="segmented" role="radiogroup" aria-label="Number of players">
+          <button data-n="1" class="on">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button>
+        </div>
+        <p class="hint" id="size-hint">Solo &rarr; pocket notebook (14&times;20)</p>
+      </div>
+
+      <div class="field">
+        <label>Game mode</label>
+        <div id="mode-picker" class="segmented" role="radiogroup" aria-label="Game mode">
+          <button data-m="dice" class="on">Dice golf</button><button data-m="speed">Speed golf</button>
+        </div>
+        <p class="hint" id="mode-hint">Roll a die each shot. Fairway +1, sand &minus;1.</p>
+      </div>
+
+      <button id="start-btn" class="btn primary big">Tee off</button>
+
+      <div class="menu-split">
+        <div class="field">
+          <label for="pdf-range">Print &amp; play</label>
+          <div class="seed-row">
+            <select id="pdf-range">
+              <option value="0">Holes 1&ndash;6</option>
+              <option value="6">Holes 7&ndash;12</option>
+              <option value="12">Holes 13&ndash;18</option>
+            </select>
+            <button id="pdf-btn" class="btn">Download PDF</button>
+          </div>
+          <p class="hint">One printable page of this seed&rsquo;s course.</p>
+        </div>
+      </div>
+
+      <details class="rules">
+        <summary>How to play</summary>
+        <div class="rules-body">
+          <p><b>Goal.</b> Get the ball <span class="glyph">&#9675;</span> into the hole <span class="glyph">&#9679;</span>. Par is 6 on every hole; the fewest total strokes wins.</p>
+          <p><b>Dice golf.</b> Roll the die to see how far the ball travels. Add 1 when hitting from the fairway, subtract 1 when hitting from sand. Then pick one of the 8 directions and the ball flies that many dots in a straight line.</p>
+          <p><b>Speed golf.</b> No die: choose a club instead. Driver moves 6 (fairway only, can fly over trees), iron moves 3 (2 from sand, never over trees), putter moves 1.</p>
+          <p><b>Terrain.</b> Trees block your shot and can never be landed on &mdash; but a shot struck <i>from the fairway</i> sails over them. Water can be flown over, never landed in. Sand shortens your next hit. Slope arrows roll the ball one extra dot (and keep rolling across chained arrows).</p>
+          <p><b>Sinking it.</b> Land exactly on the hole and it drops. If your line crosses the hole and finishes just one dot past it, that counts too.</p>
+          <p><b>Do-overs.</b> Your first shot on each hole may be re-rolled once for free. Beyond that, each player carries 6 mulligans for the whole course &mdash; spend one to re-roll any shot. You may always choose to putt (move 1) instead of using your roll.</p>
+          <p><b>Multiplayer.</b> Everyone tees off in order; after that, whoever sits furthest from the hole shoots next. Keep an eye out &mdash; a bigfoot hides somewhere in about a third of all notebooks, and spotting him earns a bonus mulligan.</p>
+        </div>
+      </details>
+    </div>
+
+    <footer class="menu-foot">
+      <button id="mute-btn" class="btn ghost small">Sound: on</button>
+      <span class="credit">an homage to pencil-and-paper golf notebooks</span>
+    </footer>
+  </div>
+</section>
+
+<!-- ============ GAME SCREEN ============ -->
+<section id="game" class="screen hidden">
+  <header class="game-bar">
+    <button id="exit-btn" class="btn ghost small" title="Back to menu">&larr; Menu</button>
+    <div class="game-title">
+      <b id="course-name">Course</b>
+      <span id="hole-label">Hole 1 / 18</span>
+      <span class="seed-chip" id="seed-chip" title="Course seed"></span>
+    </div>
+    <div class="game-bar-actions">
+      <button id="score-btn" class="btn ghost small">Scorecard</button>
+      <button id="pdf-btn2" class="btn ghost small">PDF</button>
+      <button id="mute-btn2" class="btn ghost small" title="Toggle sound">&#9835;</button>
+    </div>
+  </header>
+
+  <main class="table-felt">
+    <div class="notebook">
+      <div class="spiral" aria-hidden="true"></div>
+      <div class="page">
+        <div id="board-wrap"><!-- SVG board injected here --></div>
+        <div class="page-foot">
+          <span id="foot-hole">Hole 1</span>
+          <span id="foot-players"></span>
+          <span id="foot-par">Par 6</span>
+        </div>
+      </div>
+      <div id="dice-stage" aria-hidden="true"></div>
+      <div id="banner" class="banner hidden"></div>
+    </div>
+
+    <aside class="tray">
+      <div class="turn-card">
+        <div class="turn-label">Now shooting</div>
+        <div id="turn-player" class="turn-player"><span class="dot"></span><span class="nm">Player 1</span></div>
+        <div id="turn-lie" class="turn-lie">on the rough</div>
+      </div>
+
+      <div id="msg" class="msg">Roll the die to begin.</div>
+
+      <div id="controls" class="controls"></div>
+
+      <div class="tray-foot">
+        <div id="mulligan-count" class="mulligans"></div>
+      </div>
+    </aside>
+  </main>
+</section>
+
+<!-- ============ SCORECARD MODAL ============ -->
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><b>Scorecard</b><button id="modal-close" class="btn ghost small">&times;</button></div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<script src="js/rng.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/course.js"></script>
+<script src="js/dice.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

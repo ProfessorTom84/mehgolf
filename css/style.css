@@ -1,0 +1,231 @@
+/* ============ Meh Golf — paper & pencil ============ */
+:root{
+  --paper:#FAF8F2;
+  --paper-shade:#F1EEE5;
+  --ink:#24262B;
+  --graphite:#C6C2B8;
+  --fair:#E4E2DA;
+  --fair-dot:#A8A59A;
+  --water:#969C9F;
+  --sand:#F0E8D2;
+  --desk:#2E4238;         /* clubhouse green desk */
+  --desk-2:#26382F;
+  --p1:#D93A2B; --p2:#2B55D9; --p3:#1F8A46; --p4:#8A3DB8;
+  --radius:10px;
+  --mono:"Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--mono);
+  color:var(--ink);
+  background:
+    radial-gradient(1200px 700px at 70% -10%, #3A5346 0%, transparent 60%),
+    linear-gradient(160deg, var(--desk), var(--desk-2));
+  min-height:100vh;
+}
+button{font-family:inherit;color:inherit;cursor:pointer}
+.hidden{display:none !important}
+.screen{min-height:100vh}
+
+/* ---------- buttons ---------- */
+.btn{
+  background:var(--paper); border:2px solid var(--ink);
+  border-radius:8px; padding:.5rem .9rem; font-weight:700; letter-spacing:.02em;
+  box-shadow:2px 2px 0 var(--ink); transition:transform .08s ease, box-shadow .08s ease;
+}
+.btn:hover{transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--ink)}
+.btn:active{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+.btn:disabled{opacity:.45; cursor:not-allowed; transform:none; box-shadow:2px 2px 0 var(--ink)}
+.btn.primary{background:var(--ink); color:var(--paper)}
+.btn.big{width:100%; padding:.85rem 1rem; font-size:1.05rem; letter-spacing:.12em; text-transform:uppercase}
+.btn.ghost{box-shadow:none; border-color:transparent; background:transparent}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.small{padding:.3rem .6rem; font-size:.85rem}
+:focus-visible{outline:3px dashed var(--p1); outline-offset:2px}
+
+/* ---------- menu ---------- */
+#menu{display:grid; place-items:center; padding:2rem 1rem}
+.menu-card{
+  width:min(560px,100%);
+  background:var(--paper);
+  border-radius:var(--radius);
+  box-shadow:0 24px 60px rgba(0,0,0,.45), 0 2px 0 rgba(255,255,255,.15) inset;
+  padding:2rem 2rem 1.25rem;
+  background-image:radial-gradient(var(--graphite) 1px, transparent 1.4px);
+  background-size:26px 26px;
+  background-position:13px 13px;
+}
+.masthead{text-align:center; margin-bottom:1.4rem}
+.masthead h1{
+  margin:.4rem 0 0; font-size:clamp(2.6rem,9vw,3.6rem); letter-spacing:.14em; line-height:1;
+  text-shadow:3px 3px 0 var(--graphite);
+}
+.tagline{margin:.35rem 0 .6rem; font-style:italic; color:#5b5e57}
+.masthead-rule{height:2px; background:var(--ink); position:relative}
+.masthead-rule::after{content:""; position:absolute; left:0; right:0; top:4px; height:1px; background:var(--ink)}
+.menu-form{display:flex; flex-direction:column; gap:1.1rem}
+.field label{display:block; font-weight:700; text-transform:uppercase; font-size:.78rem; letter-spacing:.14em; margin-bottom:.35rem}
+.hint{margin:.3rem 0 0; font-size:.78rem; color:#6a6d64}
+.seed-row{display:flex; gap:.5rem}
+.seed-row input, .seed-row select{
+  flex:1; font-family:inherit; font-size:1rem; padding:.5rem .7rem;
+  border:2px solid var(--ink); border-radius:8px; background:#fff; min-width:0;
+}
+.segmented{display:inline-flex; border:2px solid var(--ink); border-radius:8px; overflow:hidden; background:#fff}
+.segmented button{border:0; background:transparent; padding:.5rem 1rem; font-weight:700; border-right:2px solid var(--ink)}
+.segmented button:last-child{border-right:0}
+.segmented button.on{background:var(--ink); color:var(--paper)}
+.menu-split{border-top:2px dashed var(--graphite); padding-top:1rem}
+.rules summary{cursor:pointer; font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.78rem}
+.rules-body{font-size:.88rem; line-height:1.55; background:#fff; border:2px solid var(--ink); border-radius:8px; padding: .3rem .9rem; margin-top:.5rem}
+.glyph{font-size:1rem}
+.menu-foot{display:flex; justify-content:space-between; align-items:center; margin-top:1.2rem; gap:1rem}
+.credit{font-size:.72rem; color:#6a6d64; font-style:italic; text-align:right}
+
+/* ---------- game bar ---------- */
+.game-bar{
+  display:flex; align-items:center; gap:.8rem; padding:.55rem .9rem;
+  color:var(--paper);
+}
+.game-bar .btn.ghost{color:var(--paper)}
+.game-bar .btn.ghost:hover{border-color:var(--paper)}
+.game-title{flex:1; display:flex; align-items:baseline; gap:.7rem; flex-wrap:wrap}
+.game-title b{font-size:1.05rem; letter-spacing:.04em}
+#hole-label{opacity:.85; font-size:.9rem}
+.seed-chip{font-size:.72rem; opacity:.6; border:1px solid rgba(255,255,255,.35); border-radius:99px; padding:.05rem .5rem}
+.game-bar-actions{display:flex; gap:.3rem}
+
+/* ---------- table ---------- */
+.table-felt{
+  display:flex; gap:1.6rem; align-items:flex-start; justify-content:center;
+  padding:0 1rem 2.5rem; flex-wrap:wrap;
+}
+
+/* ---------- notebook ---------- */
+.notebook{position:relative; filter:drop-shadow(0 22px 30px rgba(0,0,0,.5))}
+.spiral{
+  height:30px; margin:0 18px -6px; position:relative; z-index:3;
+  background:
+    radial-gradient(circle at 50% 42%, #1c1d20 0 4.5px, #3c3e44 5.5px 7px, transparent 8px);
+  background-size:24px 30px;
+  background-repeat:repeat-x;
+}
+.page{
+  background:var(--paper);
+  border-radius:6px 6px 12px 12px;
+  padding:14px 14px 8px;
+  position:relative;
+  box-shadow:0 1px 0 #d8d4c8 inset;
+}
+.page::after{ /* stacked pages edge */
+  content:""; position:absolute; left:6px; right:-4px; bottom:-5px; height:6px;
+  background:repeating-linear-gradient(90deg,#e7e3d7 0 40px, #dcd7c9 40px 41px);
+  border-radius:0 0 10px 10px; z-index:-1;
+}
+#board-wrap svg{display:block; width:min(62vw, 560px); height:auto}
+.page-foot{
+  display:flex; gap:1rem; justify-content:space-between; align-items:center;
+  border-top:2px solid var(--ink); margin-top:8px; padding:6px 4px 4px;
+  font-size:.85rem; letter-spacing:.03em; flex-wrap:wrap;
+}
+#foot-players{display:flex; gap:.9rem; flex-wrap:wrap}
+.foot-p{display:inline-flex; align-items:center; gap:.3rem}
+.foot-p .pip{width:9px; height:9px; border-radius:50%; border:1.5px solid currentColor; display:inline-block}
+.foot-p .pip.f{background:currentColor}
+
+/* ---------- board svg ---------- */
+.aim-arrow{cursor:pointer}
+.aim-arrow polygon{fill:var(--ink); opacity:.65; transition:opacity .12s, transform .12s}
+.aim-arrow:hover polygon{opacity:1}
+.aim-arrow.blocked{cursor:not-allowed}
+.aim-arrow.blocked polygon{opacity:.14}
+.preview-line{pointer-events:none}
+.stroke-line{stroke-linecap:round}
+.ball-current{filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+@keyframes sinkball{to{transform:scale(.1); opacity:0}}
+.sinking{animation:sinkball .5s ease-in forwards; transform-origin:center; transform-box:fill-box}
+@keyframes popfoot{0%{transform:scale(1)}50%{transform:scale(1.6)}100%{transform:scale(1)}}
+.bigfoot-found{animation:popfoot .5s ease; transform-origin:center; transform-box:fill-box}
+.bigfoot{cursor:pointer}
+
+/* ---------- dice ---------- */
+#dice-stage{position:absolute; inset:0; z-index:5; pointer-events:none; perspective:900px; overflow:hidden}
+.die{position:absolute; width:54px; height:54px; transform-style:preserve-3d; will-change:transform}
+.die .face{
+  position:absolute; width:54px; height:54px; background:var(--paper);
+  border:2.5px solid var(--ink); border-radius:10px;
+  display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr); padding:7px;
+  box-shadow:inset 0 0 8px rgba(0,0,0,.08);
+}
+.die .pip{width:9px; height:9px; border-radius:50%; background:var(--ink); align-self:center; justify-self:center}
+.f1{transform:rotateY(0deg) translateZ(27px)}
+.f2{transform:rotateY(90deg) translateZ(27px)}
+.f3{transform:rotateX(90deg) translateZ(27px)}
+.f4{transform:rotateX(-90deg) translateZ(27px)}
+.f5{transform:rotateY(-90deg) translateZ(27px)}
+.f6{transform:rotateY(180deg) translateZ(27px)}
+.die-shadow{position:absolute; width:54px; height:14px; border-radius:50%; background:rgba(0,0,0,.30); filter:blur(4px)}
+
+/* ---------- tray ---------- */
+.tray{
+  width:280px; background:var(--paper); border-radius:var(--radius);
+  box-shadow:0 18px 40px rgba(0,0,0,.4);
+  padding:1rem; display:flex; flex-direction:column; gap:.9rem;
+  position:sticky; top:1rem;
+}
+.turn-card{border:2px solid var(--ink); border-radius:8px; padding:.6rem .8rem; background:#fff}
+.turn-label{font-size:.7rem; text-transform:uppercase; letter-spacing:.16em; color:#6a6d64}
+.turn-player{display:flex; align-items:center; gap:.5rem; font-weight:700; font-size:1.1rem; margin-top:.15rem}
+.turn-player .dot{width:14px; height:14px; border-radius:50%; background:var(--p1); box-shadow:1px 1px 0 var(--ink)}
+.turn-lie{font-size:.8rem; color:#6a6d64; font-style:italic}
+.msg{min-height:2.6em; font-size:.92rem; line-height:1.4; border-left:3px solid var(--graphite); padding-left:.6rem}
+.controls{display:flex; flex-direction:column; gap:.5rem}
+.controls .row{display:flex; gap:.5rem}
+.controls .row .btn{flex:1}
+.roll-readout{
+  display:flex; align-items:center; gap:.7rem; justify-content:center;
+  border:2px dashed var(--graphite); border-radius:8px; padding:.5rem;
+}
+.roll-readout .num{font-size:2rem; font-weight:700}
+.roll-readout .calc{font-size:.8rem; color:#6a6d64; text-align:left}
+.mulligans{font-size:.8rem; color:#6a6d64}
+.mull-pip{display:inline-block; width:10px; height:10px; border:1.5px solid var(--ink); border-radius:2px; margin-right:3px; vertical-align:-1px}
+.mull-pip.used{background:var(--ink); opacity:.35}
+
+/* ---------- banner ---------- */
+.banner{
+  position:absolute; inset:0; z-index:6; display:grid; place-items:center;
+  background:rgba(36,38,43,.35); border-radius:12px;
+}
+.banner-card{
+  background:var(--paper); border:3px solid var(--ink); border-radius:12px;
+  box-shadow:6px 6px 0 var(--ink); padding:1.2rem 1.6rem; text-align:center;
+  max-width:85%;
+  animation:bannerin .35s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes bannerin{from{transform:translateY(16px) scale(.92); opacity:0}}
+.banner-card h2{margin:.1rem 0 .4rem; letter-spacing:.06em}
+.banner-card p{margin:.2rem 0; font-size:.9rem}
+.banner-card .btn{margin-top:.8rem}
+
+/* ---------- modal ---------- */
+.modal{position:fixed; inset:0; background:rgba(20,22,25,.55); display:grid; place-items:center; z-index:20; padding:1rem}
+.modal-card{background:var(--paper); border-radius:12px; border:3px solid var(--ink); box-shadow:8px 8px 0 rgba(0,0,0,.35); width:min(640px,100%); max-height:85vh; display:flex; flex-direction:column}
+.modal-head{display:flex; justify-content:space-between; align-items:center; padding:.8rem 1rem; border-bottom:2px solid var(--ink)}
+.modal-body{padding:1rem; overflow:auto}
+.score-table{border-collapse:collapse; width:100%; font-size:.82rem}
+.score-table th,.score-table td{border:1px solid var(--graphite); padding:.25rem .4rem; text-align:center}
+.score-table th{background:var(--paper-shade)}
+.score-table td.now{outline:2px solid var(--ink)}
+.score-table .tot{font-weight:700; background:var(--paper-shade)}
+
+/* ---------- responsive ---------- */
+@media (max-width:900px){
+  .table-felt{flex-direction:column; align-items:center}
+  .tray{width:min(560px,100%); position:static}
+  #board-wrap svg{width:min(92vw,560px)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s !important; transition-duration:.001s !important}
+}

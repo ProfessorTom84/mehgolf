@@ -1,0 +1,100 @@
+/* A CSS-3D die that tumbles and bounces across the notebook page, then settles on the result. */
+(function (global) {
+  "use strict";
+
+  // pip layouts on a 3x3 grid (cell indices 0..8)
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  // final cube rotation that shows each face to the camera
+  const FACE_ROT = {
+    1: [0, 0], 2: [0, -90], 3: [-90, 0], 4: [90, 0], 5: [0, 90], 6: [0, 180]
+  };
+
+  function buildDie(color) {
+    const die = document.createElement("div");
+    die.className = "die";
+    for (let f = 1; f <= 6; f++) {
+      const face = document.createElement("div");
+      face.className = "face f" + f;
+      for (let i = 0; i < 9; i++) {
+        const c = document.createElement("div");
+        if (PIPS[f].includes(i)) { c.className = "pip"; if (color) c.style.background = color; }
+        face.appendChild(c);
+      }
+      die.appendChild(face);
+    }
+    return die;
+  }
+
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+  /**
+   * Roll the die across `stage`. Resolves with nothing once settled (value chosen by caller).
+   * @param {HTMLElement} stage overlay element
+   * @param {number} value 1..6 final face
+   * @param {string} color pip color
+   */
+  function roll(stage, value, color) {
+    return new Promise(resolve => {
+      stage.innerHTML = "";
+      const W = stage.clientWidth, H = stage.clientHeight;
+      const die = buildDie(color);
+      const shadow = document.createElement("div");
+      shadow.className = "die-shadow";
+      stage.appendChild(shadow);
+      stage.appendChild(die);
+
+      // random entry edge -> random landing spot in middle band
+      const fromLeft = Math.random() < 0.5;
+      const x0 = fromLeft ? -80 : W + 30;
+      const y0 = H * (0.15 + Math.random() * 0.3);
+      const x1 = W * (0.25 + Math.random() * 0.5);
+      const y1 = H * (0.45 + Math.random() * 0.3);
+
+      const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const DUR = calm ? 320 : 1250, SETTLE = calm ? 140 : 420, bounces = calm ? 1 : 3;
+      const spinX = (720 + Math.random() * 540) * (Math.random() < 0.5 ? 1 : -1);
+      const spinY = (720 + Math.random() * 540) * (Math.random() < 0.5 ? 1 : -1);
+      const [fx, fy] = FACE_ROT[value];
+      const hop = calm ? 18 : 90 + Math.random() * 50;
+
+      let start = null, ticked = new Set();
+
+      function frame(ts) {
+        if (!start) start = ts;
+        const el = ts - start;
+
+        if (el <= DUR) {
+          const t = el / DUR, e = easeOut(t);
+          const x = x0 + (x1 - x0) * e;
+          const y = y0 + (y1 - y0) * e;
+          const b = Math.abs(Math.sin(t * Math.PI * bounces)) * hop * (1 - t);
+          // clatter on each touchdown
+          const phase = Math.floor(t * bounces * 2);
+          if (b < 6 && !ticked.has(phase)) { ticked.add(phase); SFX.diceTick(); }
+          die.style.transform =
+            `translate(${x - 27}px, ${y - 27 - b}px) rotateX(${spinX * e}deg) rotateY(${spinY * e}deg)`;
+          shadow.style.transform = `translate(${x - 27}px, ${y + 22}px) scale(${1 - b / 260})`;
+          shadow.style.opacity = String(0.7 - b / 300);
+          requestAnimationFrame(frame);
+        } else if (el <= DUR + SETTLE) {
+          const t = (el - DUR) / SETTLE, e = easeOut(t);
+          const rx = spinX + ((Math.round(spinX / 360) * 360 + fx) - spinX) * e;
+          const ry = spinY + ((Math.round(spinY / 360) * 360 + fy) - spinY) * e;
+          die.style.transform = `translate(${x1 - 27}px, ${y1 - 27}px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+          shadow.style.transform = `translate(${x1 - 27}px, ${y1 + 22}px) scale(1)`;
+          requestAnimationFrame(frame);
+        } else {
+          SFX.diceTick();
+          setTimeout(() => {
+            die.style.transition = "opacity .35s"; shadow.style.transition = "opacity .35s";
+            die.style.opacity = "0"; shadow.style.opacity = "0";
+            setTimeout(() => { stage.innerHTML = ""; resolve(); }, 380);
+          }, 650);
+        }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  global.Dice = { roll };
+})(window);
