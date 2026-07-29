@@ -206,44 +206,68 @@
   function buildAmbience(svg, w, h) {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
+    const rngA = RNG.rngFor(S.seed + "|amb|" + S.holeIdx);
+    // Half the holes get a bird heading the other way, so it doesn't feel like
+    // the same loop every time.
+    const eastbound = rngA() < 0.5;
+    const x0 = eastbound ? -50 : w + 50;
+    const x1 = eastbound ? w + 50 : -50;
+    const yA = h * (0.10 + rngA() * 0.12);
+    const yB = h * (0.05 + rngA() * 0.10);
+    const yC = h * (0.12 + rngA() * 0.12);
+    const at = (t, x, y) => `${t}% { transform: translate(${x.toFixed(1)}px, ${y.toFixed(1)}px); }`;
+
     const st = document.createElementNS("http://www.w3.org/2000/svg", "style");
     st.textContent = `
+      /* One slow pass, then a long rest offscreen. The crossing takes ~40s of
+         a 100s cycle, so the bird is an occasional visitor, not a metronome. */
       @keyframes mg-bird {
-        0%   { transform: translate(${-40}px, ${h * 0.16}px); opacity: 0; }
-        6%   { opacity: .75; }
-        50%  { transform: translate(${w * 0.5}px, ${h * 0.07}px); opacity: .75; }
-        94%  { opacity: .75; }
-        100% { transform: translate(${w + 40}px, ${h * 0.13}px); opacity: 0; }
+        0%   { transform: translate(${x0.toFixed(1)}px, ${yA.toFixed(1)}px); opacity: 0; }
+        3%   { opacity: .7; }
+        ${at(12, x0 + (x1 - x0) * 0.22, yB)}
+        ${at(22, x0 + (x1 - x0) * 0.44, yA)}
+        ${at(31, x0 + (x1 - x0) * 0.66, yC)}
+        37%  { opacity: .7; }
+        ${at(40, x1, yB)}
+        40.1% { opacity: 0; }
+        100% { transform: translate(${x1.toFixed(1)}px, ${yB.toFixed(1)}px); opacity: 0; }
       }
+      /* Two lazy flaps, then a long glide. */
       @keyframes mg-flap {
-        0%, 100% { transform: scaleY(1); }
-        50%      { transform: scaleY(.35); }
+        0%   { transform: scaleY(1); }
+        5%   { transform: scaleY(.45); }
+        11%  { transform: scaleY(1); }
+        17%  { transform: scaleY(.5); }
+        23%  { transform: scaleY(1); }
+        100% { transform: scaleY(1); }
       }
       @keyframes mg-gust {
         0%   { transform: translate(${-90}px, 0); opacity: 0; }
-        12%  { opacity: .5; }
-        88%  { opacity: .5; }
-        100% { transform: translate(${w + 90}px, ${-h * 0.05}px); opacity: 0; }
+        10%  { opacity: .42; }
+        40%  { opacity: .42; }
+        50%  { transform: translate(${(w + 90).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
+        100% { transform: translate(${(w + 90).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
       }
       @keyframes mg-leaf {
         0%   { transform: translate(0,0) rotate(0deg); opacity: 0; }
-        10%  { opacity: .7; }
-        100% { transform: translate(${34}px, ${h * 0.3}px) rotate(320deg); opacity: 0; }
+        8%   { opacity: .65; }
+        90%  { opacity: .2; }
+        100% { transform: translate(${34}px, ${(h * 0.3).toFixed(1)}px) rotate(300deg); opacity: 0; }
       }
-      .mg-bird { animation: mg-bird 17s linear infinite; }
-      .mg-wing { animation: mg-flap .34s ease-in-out infinite; transform-origin: center; }
-      .mg-gust { animation: mg-gust 13s linear infinite; }
-      .mg-leaf { animation: mg-leaf 9s ease-in infinite; }
+      .mg-bird { animation: mg-bird 100s linear infinite; }
+      .mg-wing { animation: mg-flap 3.6s ease-in-out infinite; transform-origin: center; }
+      .mg-gust { animation: mg-gust 46s linear infinite; }
+      .mg-leaf { animation: mg-leaf 15s ease-in infinite; }
     `;
     svg.appendChild(st);
 
     const amb = el("g", { id: "ambience", "pointer-events": "none" }, svg);
-    const rng = RNG.rngFor(S.seed + "|amb|" + S.holeIdx);
+    const rng = rngA;
 
     // two faint wind streaks at different heights and speeds
     for (let i = 0; i < 2; i++) {
       const y = h * (0.2 + rng() * 0.55);
-      const g0 = el("g", { class: "mg-gust", style: `animation-delay:${(-rng() * 13).toFixed(1)}s; animation-duration:${(11 + rng() * 7).toFixed(1)}s` }, amb);
+      const g0 = el("g", { class: "mg-gust", style: `animation-delay:${(-rng() * 46).toFixed(1)}s; animation-duration:${(40 + rng() * 22).toFixed(1)}s` }, amb);
       el("path", {
         d: `M0 ${y.toFixed(1)} q 26 -7 52 0 t 52 0`,
         fill: "none", stroke: "#8FA08C", "stroke-width": 1.6,
@@ -257,8 +281,9 @@
     }
 
     // a bird, wings flapping, crossing the page every so often
-    const bird = el("g", { class: "mg-bird", style: `animation-delay:${(-rng() * 17).toFixed(1)}s` }, amb);
-    const wing = el("g", { class: "mg-wing" }, bird);
+    const bird = el("g", { class: "mg-bird", style: `animation-delay:${(-rng() * 100).toFixed(1)}s` }, amb);
+    const facing = el("g", { transform: eastbound ? "scale(1,1)" : "scale(-1,1)" }, bird);
+    const wing = el("g", { class: "mg-wing" }, facing);
     el("path", {
       d: "M-9 0 q 4.5 -5 9 0 q 4.5 -5 9 0",
       fill: "none", stroke: "#4A5250", "stroke-width": 1.9,
@@ -274,7 +299,7 @@
       const [tx, ty] = trees[(rng() * trees.length) | 0];
       const lf = el("g", {
         class: "mg-leaf",
-        style: `animation-delay:${(-rng() * 9).toFixed(1)}s; animation-duration:${(8 + rng() * 5).toFixed(1)}s;` +
+        style: `animation-delay:${(-rng() * 15).toFixed(1)}s; animation-duration:${(13 + rng() * 9).toFixed(1)}s;` +
                `transform-origin:${px(tx)}px ${px(ty)}px`
       }, amb);
       el("ellipse", {
