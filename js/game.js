@@ -177,15 +177,21 @@
     wrap.appendChild(svg);
     svg.dataset.vw = w; svg.dataset.vh = h;
     wireHover(svg);
-    fitBoard();
+    fitBoard(true);
     drawTrails(); drawBalls();
   }
 
   // Size the board svg to whatever space is actually available, instead of
   // just capping its width and letting a tall grid overflow the viewport.
-  function fitBoard() {
+  let lastFitW = 0, lastFitH = 0;
+  function fitBoard(force) {
     const svg = document.getElementById("board");
     if (!svg) return;
+    // Nothing but a real viewport change (or a fresh board) may trigger a
+    // resize. This makes it structurally impossible for hover text, the shot
+    // history growing, or any other DOM update to nudge the board's size.
+    if (!force && window.innerWidth === lastFitW && window.innerHeight === lastFitH) return;
+    lastFitW = window.innerWidth; lastFitH = window.innerHeight;
     const vw = Number(svg.dataset.vw), vh = Number(svg.dataset.vh);
     if (!vw || !vh) return;
 
@@ -214,7 +220,7 @@
     // of these pushes the footer off-screen.
     const top = $("#board-wrap").getBoundingClientRect().top;
     let belowH = 0;
-    ["#board-tip", ".page-foot"].forEach(sel => {
+    [".board-slot", ".page-foot"].forEach(sel => {
       const n = document.querySelector(sel);
       if (n) belowH += n.getBoundingClientRect().height;
     });

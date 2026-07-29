@@ -230,14 +230,20 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .mull-pip{display:inline-block; width:10px; height:10px; border:1.5px solid var(--ink); border-radius:2px; margin-right:3px; vertical-align:-1px}
 .mull-pip.used{background:var(--ink); opacity:.35}
 
+.build-tag{font-size:.62rem; color:#7f8a80; letter-spacing:.1em; margin-left:.5rem}
+
 /* ---------- hover inspector ---------- */
-/* Fixed height on purpose: this strip sits between the board and the footer,
-   so if it grew or shrank with its content it would change the space available
-   to the board and make it visibly jump while the pointer moves around. */
+/* This strip is taken OUT OF FLOW on purpose. It sits between the board and the
+   footer, and its text length changes on every hover; if it participated in
+   layout at all, the board's available height would change as the pointer moved
+   and the board would visibly jump. A constant-height slot holds the space and
+   the strip is absolutely positioned inside it, so hover text can never — under
+   any content, font size or zoom level — affect the board. */
+.board-slot{position:relative; height:52px; flex:0 0 52px}
 .board-tip{
-  border-top:2px dashed var(--graphite); margin-top:6px; padding:4px 4px 0;
-  font-size:.76rem; line-height:1.3;
-  height:46px; min-height:46px; max-height:46px; overflow:hidden;
+  position:absolute; left:0; right:0; top:0; bottom:0;
+  border-top:2px dashed var(--graphite); padding:4px 4px 0;
+  font-size:.76rem; line-height:1.3; overflow:hidden;
 }
 .board-tip b{display:block; letter-spacing:.04em}
 .board-tip span{
