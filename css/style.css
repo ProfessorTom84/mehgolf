@@ -54,7 +54,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
    desktop-sized so the whole thing fits without scrolling. */
 #menu{display:grid; place-items:center; padding:1rem; height:100vh; overflow:hidden}
 .menu-card{
-  width:min(920px,100%); max-height:calc(100vh - 2rem); overflow:hidden;
+  width:min(920px,100%); max-height:calc(100vh - 2rem); overflow-y:auto; overflow-x:hidden;
   display:flex; flex-direction:column;
   background:var(--paper);
   border-radius:var(--radius);
@@ -72,20 +72,55 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .tagline{margin:.2rem 0 .4rem; font-size:.85rem; font-style:italic; color:#5b5e57}
 .masthead-rule{height:2px; background:var(--ink); position:relative}
 .masthead-rule::after{content:""; position:absolute; left:0; right:0; top:4px; height:1px; background:var(--ink)}
-.menu-form{
-  display:grid; grid-template-columns:1fr 1fr; gap:.7rem 1.6rem;
-  align-content:start; min-height:0; overflow:hidden; flex:1 1 auto;
+.menu-paths{
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+  flex:0 0 auto; align-items:stretch;
 }
-.menu-form > .field, .menu-form > .menu-split{grid-column:1}
-.menu-form > #start-btn{grid-column:1; margin-top:.15rem}
-.menu-form > .rules{grid-column:2; grid-row:1 / span 5; min-height:0; display:flex; flex-direction:column}
-.menu-form .rules-body{flex:1 1 auto; overflow-y:auto; min-height:0}
-@media (max-width:820px){
-  .menu-form{grid-template-columns:1fr}
-  .menu-form > .rules{grid-column:1; grid-row:auto}
+.path-card{
+  display:flex; flex-direction:column; gap:.6rem; min-height:0;
+  background:#fff; border:2px solid var(--ink); border-radius:12px;
+  padding:.9rem 1rem 1rem;
+  box-shadow:4px 4px 0 var(--graphite);
+}
+.path-head{display:flex; gap:.6rem; align-items:flex-start}
+.path-icon{color:var(--ink); flex:0 0 auto; margin-top:2px}
+.path-head h2{
+  margin:0; font-size:1.02rem; letter-spacing:.1em; text-transform:uppercase;
+}
+.path-head p{margin:.15rem 0 0; font-size:.76rem; color:#6a6d64; line-height:1.35}
+.path-cta{margin-top:auto; width:100%}
+.paper-points{
+  margin:.1rem 0 .2rem; padding-left:1.05rem; font-size:.78rem; line-height:1.45; color:#4a4d46;
+}
+.paper-points li{margin-bottom:.32rem}
+.path-card select{
+  width:100%; font-family:inherit; font-size:.9rem; padding:.4rem .6rem;
+  border:2px solid var(--ink); border-radius:8px; background:#fff;
+}
+.rules{flex:0 1 auto; margin-top:.7rem; min-height:0; display:flex; flex-direction:column}
+@media (max-width:860px){
+  .menu-paths{grid-template-columns:1fr}
   #menu{height:auto; min-height:100vh; overflow:visible}
   .menu-card{max-height:none; overflow:visible}
 }
+/* Very short windows (small laptops, scaled displays): tighten everything so
+   the whole menu still lands above the fold. */
+@media (max-height:660px){
+  .menu-card{padding:.7rem 1rem .55rem}
+  .masthead{margin-bottom:.4rem}
+  .masthead h1{font-size:1.7rem}
+  .tagline{display:none}
+  .path-card{padding:.6rem .75rem .7rem; gap:.42rem}
+  .path-head h2{font-size:.92rem}
+  .path-head p{font-size:.7rem}
+  .paper-points{font-size:.71rem; line-height:1.35}
+  .paper-points li{margin-bottom:.22rem}
+  .hint{font-size:.67rem}
+  .btn.big{padding:.55rem 1rem; font-size:.95rem}
+  .menu-foot{margin-top:.4rem}
+  .credit{font-size:.66rem}
+}
+
 .field label{display:block; font-weight:700; text-transform:uppercase; font-size:.72rem; letter-spacing:.14em; margin-bottom:.25rem}
 .hint{margin:.2rem 0 0; font-size:.72rem; color:#6a6d64}
 .seed-row{display:flex; gap:.5rem}
@@ -98,8 +133,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .segmented button:last-child{border-right:0}
 .segmented button.on{background:var(--ink); color:var(--paper)}
 .menu-split{border-top:2px dashed var(--graphite); padding-top:.6rem}
-.rules summary{cursor:pointer; font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.78rem}
-.rules-body{font-size:.78rem; line-height:1.45; background:#fff; border:2px solid var(--ink); border-radius:8px; padding: .3rem .9rem; margin-top:.5rem}
+.rules summary{cursor:pointer; flex:0 0 auto; font-weight:700; text-transform:uppercase; letter-spacing:.14em; font-size:.78rem}
+.rules-body{font-size:.8rem; line-height:1.5; flex:0 1 auto; max-height:34vh; overflow-y:auto; min-height:0; background:#fff; border:2px solid var(--ink); border-radius:8px; padding: .3rem .9rem; margin-top:.5rem}
 .glyph{font-size:1rem}
 .menu-foot{display:flex; justify-content:space-between; align-items:center; margin-top:.6rem; gap:1rem; flex:0 0 auto}
 .credit{font-size:.72rem; color:#6a6d64; font-style:italic; text-align:right}
@@ -125,7 +160,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ---------- shot history ---------- */
 .side{
-  width:262px; flex:0 0 262px; min-height:0; max-height:100%;
+  width:262px; flex:0 0 262px; min-height:0; max-height:100%; overflow:hidden;
   display:flex; flex-direction:column; gap:.7rem;
 }
 .panel{
@@ -137,10 +172,10 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   font-size:.68rem; text-transform:uppercase; letter-spacing:.16em; color:#6a6d64;
   border-bottom:2px solid var(--ink); padding-bottom:.35rem; margin-bottom:.4rem; flex:0 0 auto;
 }
-.history{flex:1 1 auto; min-height:96px}
+.history{flex:1 1 auto; min-height:0}
 .legend-panel{flex:0 0 auto; max-height:46%}
-.side-right .tray{flex:0 0 auto}
-.score-panel{flex:1 1 auto; min-height:90px}
+.side-right .tray{flex:0 1 auto; min-height:0; overflow-y:auto}
+.score-panel{flex:1 1 auto; min-height:0}
 .history-list{overflow-y:auto; font-size:.78rem; line-height:1.45; flex:1 1 auto}
 .history-empty{color:#8a8d84; font-style:italic; margin:.2rem 0}
 .history-hole{margin-bottom:.7rem}
@@ -169,11 +204,6 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   padding:14px 14px 8px;
   position:relative;
   box-shadow:0 1px 0 #d8d4c8 inset;
-}
-.page::after{ /* stacked pages edge */
-  content:""; position:absolute; left:6px; right:-4px; bottom:-5px; height:6px;
-  background:repeating-linear-gradient(90deg,#e7e3d7 0 40px, #dcd7c9 40px 41px);
-  border-radius:0 0 10px 10px; z-index:-1;
 }
 #board-wrap svg{display:block; width:min(62vw, 560px); height:auto; max-width:100%}
 .page-foot{
@@ -280,23 +310,24 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 /* A slow breeze. Rotation only, anchored at each trunk, so nothing reflows and
    the board's measured size is untouched. */
 @keyframes sway{
-  0%,100%{transform:rotate(-1.5deg)}
-  50%    {transform:rotate(1.5deg)}
+  0%,100%{transform:rotate(-4deg)}
+  50%    {transform:rotate(4deg)}
 }
 .tree-sway{
   animation-name:sway; animation-timing-function:ease-in-out;
   animation-iteration-count:infinite; will-change:transform;
 }
 @keyframes shimmer{
-  0%,100%{opacity:.35; r:1.6}
-  50%    {opacity:1;   r:2.3}
+  0%,100%{opacity:.3; r:1.4}
+  50%    {opacity:1;  r:2.6}
 }
 .water-shimmer{
   animation:shimmer 3.6s ease-in-out infinite;
   transform-origin:center;
 }
 @media (prefers-reduced-motion: reduce){
-  .tree-sway, .water-shimmer{animation:none}
+  .tree-sway, .water-shimmer, .mg-bird, .mg-wing, .mg-gust, .mg-leaf{animation:none !important}
+  #ambience{display:none}
 }
 
 /* ---------- hover inspector ---------- */

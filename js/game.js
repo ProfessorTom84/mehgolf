@@ -142,8 +142,8 @@
         const g0 = el("g", {
           class: "tree-sway",
           style: `transform-origin:${px(x)}px ${px(y) + 9}px; ` +
-                 `animation-delay:${(-swayR() * 6).toFixed(2)}s; ` +
-                 `animation-duration:${(4.4 + swayR() * 2.6).toFixed(2)}s`
+                 `animation-delay:${(-swayR() * 5).toFixed(2)}s; ` +
+                 `animation-duration:${(3.2 + swayR() * 1.9).toFixed(2)}s`
         }, feat);
         if (c.tree === 2) { // round tree
           el("circle", { cx: px(x), cy: px(y) - 3, r: 8.5, fill: "#3A3F3A" }, g0);
@@ -182,6 +182,7 @@
     el("circle", { cx: px(G.hole.x), cy: px(G.hole.y), r: 8, fill: "#24262B" }, feat);
     el("circle", { cx: px(G.hole.x) + 2.5, cy: px(G.hole.y) - 2.5, r: 1.8, fill: "#FAF8F2", opacity: .5 }, feat);
 
+    buildAmbience(svg, w, h);
     el("g", { id: "trails" }, svg);
     el("g", { id: "balls" }, svg);
     el("g", { id: "aim" }, svg);
@@ -194,6 +195,94 @@
     wireHover(svg);
     fitBoard(true);
     drawTrails(); drawBalls();
+  }
+
+  /**
+   * Decorative layer: a breeze that crosses the page, a bird that flies over
+   * now and then, and a few leaves drifting down. Everything is pure CSS
+   * animation inside the SVG, so it costs no JS frames and cannot affect
+   * layout. Keyframes are written per board because they need the real width.
+   */
+  function buildAmbience(svg, w, h) {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const st = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    st.textContent = `
+      @keyframes mg-bird {
+        0%   { transform: translate(${-40}px, ${h * 0.16}px); opacity: 0; }
+        6%   { opacity: .75; }
+        50%  { transform: translate(${w * 0.5}px, ${h * 0.07}px); opacity: .75; }
+        94%  { opacity: .75; }
+        100% { transform: translate(${w + 40}px, ${h * 0.13}px); opacity: 0; }
+      }
+      @keyframes mg-flap {
+        0%, 100% { transform: scaleY(1); }
+        50%      { transform: scaleY(.35); }
+      }
+      @keyframes mg-gust {
+        0%   { transform: translate(${-90}px, 0); opacity: 0; }
+        12%  { opacity: .5; }
+        88%  { opacity: .5; }
+        100% { transform: translate(${w + 90}px, ${-h * 0.05}px); opacity: 0; }
+      }
+      @keyframes mg-leaf {
+        0%   { transform: translate(0,0) rotate(0deg); opacity: 0; }
+        10%  { opacity: .7; }
+        100% { transform: translate(${34}px, ${h * 0.3}px) rotate(320deg); opacity: 0; }
+      }
+      .mg-bird { animation: mg-bird 17s linear infinite; }
+      .mg-wing { animation: mg-flap .34s ease-in-out infinite; transform-origin: center; }
+      .mg-gust { animation: mg-gust 13s linear infinite; }
+      .mg-leaf { animation: mg-leaf 9s ease-in infinite; }
+    `;
+    svg.appendChild(st);
+
+    const amb = el("g", { id: "ambience", "pointer-events": "none" }, svg);
+    const rng = RNG.rngFor(S.seed + "|amb|" + S.holeIdx);
+
+    // two faint wind streaks at different heights and speeds
+    for (let i = 0; i < 2; i++) {
+      const y = h * (0.2 + rng() * 0.55);
+      const g0 = el("g", { class: "mg-gust", style: `animation-delay:${(-rng() * 13).toFixed(1)}s; animation-duration:${(11 + rng() * 7).toFixed(1)}s` }, amb);
+      el("path", {
+        d: `M0 ${y.toFixed(1)} q 26 -7 52 0 t 52 0`,
+        fill: "none", stroke: "#8FA08C", "stroke-width": 1.6,
+        "stroke-linecap": "round", opacity: .5
+      }, g0);
+      el("path", {
+        d: `M14 ${(y + 9).toFixed(1)} q 20 -5 40 0`,
+        fill: "none", stroke: "#8FA08C", "stroke-width": 1.2,
+        "stroke-linecap": "round", opacity: .35
+      }, g0);
+    }
+
+    // a bird, wings flapping, crossing the page every so often
+    const bird = el("g", { class: "mg-bird", style: `animation-delay:${(-rng() * 17).toFixed(1)}s` }, amb);
+    const wing = el("g", { class: "mg-wing" }, bird);
+    el("path", {
+      d: "M-9 0 q 4.5 -5 9 0 q 4.5 -5 9 0",
+      fill: "none", stroke: "#4A5250", "stroke-width": 1.9,
+      "stroke-linecap": "round", "stroke-linejoin": "round"
+    }, wing);
+
+    // leaves drifting off a few of the trees
+    const trees = [];
+    const G = g();
+    for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++)
+      if (cell(G, x, y).t === T.TREE) trees.push([x, y]);
+    for (let i = 0; i < Math.min(3, trees.length); i++) {
+      const [tx, ty] = trees[(rng() * trees.length) | 0];
+      const lf = el("g", {
+        class: "mg-leaf",
+        style: `animation-delay:${(-rng() * 9).toFixed(1)}s; animation-duration:${(8 + rng() * 5).toFixed(1)}s;` +
+               `transform-origin:${px(tx)}px ${px(ty)}px`
+      }, amb);
+      el("ellipse", {
+        cx: px(tx) + 6, cy: px(ty), rx: 3.2, ry: 1.7,
+        fill: "#6E7A63", opacity: .75,
+        transform: `rotate(-25 ${px(tx) + 6} ${px(ty)})`
+      }, lf);
+    }
   }
 
   // Size the board svg to whatever space is actually available, instead of
@@ -876,7 +965,8 @@
     const bx = PAD, by = PAD + HEAD;
     const clone = live.cloneNode(true);
     clone.removeAttribute("id"); clone.removeAttribute("style"); clone.removeAttribute("aria-label");
-    ["aim", "preview"].forEach(id => { const n = clone.querySelector("#" + id); if (n) n.remove(); });
+    ["aim", "preview", "ambience"].forEach(id => { const n = clone.querySelector("#" + id); if (n) n.remove(); });
+    const st = clone.querySelector("style"); if (st) st.remove();   // animation keyframes
     clone.setAttribute("x", bx); clone.setAttribute("y", by);
     clone.setAttribute("width", vw); clone.setAttribute("height", vh);
     clone.setAttribute("viewBox", `0 0 ${vw} ${vh}`);

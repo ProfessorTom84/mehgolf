@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meh Golf</title>
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAF8F2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%2324262B'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -19,67 +19,96 @@
       <div class="masthead-rule"></div>
     </header>
 
-    <div class="menu-form">
-      <div class="field">
-        <label for="seed-input">Course seed</label>
-        <div class="seed-row">
-          <input id="seed-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" spellcheck="false" autocomplete="off">
-          <button id="shuffle-seed" class="btn ghost" title="New random seed" aria-label="New random seed">&#8635;</button>
-        </div>
-        <p class="hint">Numbers only. Share the code to play the exact same 18 holes.</p>
-      </div>
+    <div class="menu-paths">
 
-      <div class="field">
-        <label>Players</label>
-        <div id="player-picker" class="segmented" role="radiogroup" aria-label="Number of players">
-          <button data-n="1" class="on">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button>
-        </div>
-        <p class="hint" id="size-hint">Solo &rarr; pocket notebook (14&times;20)</p>
-      </div>
-
-      <div class="field">
-        <label>Game mode</label>
-        <div id="mode-picker" class="segmented" role="radiogroup" aria-label="Game mode">
-          <button data-m="dice" class="on">Dice golf</button><button data-m="speed">Speed golf</button>
-        </div>
-        <p class="hint" id="mode-hint">Roll a die each shot. Fairway +1, sand &minus;1.</p>
-      </div>
-
-      <button id="start-btn" class="btn primary big">Tee off</button>
-
-      <div class="menu-split">
-        <div class="field">
-          <label for="pdf-range">Print &amp; play</label>
-          <div class="seed-row">
-            <select id="pdf-range">
-              <option value="0:18">All 18 holes</option>
-              <option value="0:6">Holes 1&ndash;6</option>
-              <option value="6:6">Holes 7&ndash;12</option>
-              <option value="12:6">Holes 13&ndash;18</option>
-            </select>
-            <button id="pdf-btn" class="btn">Download PDF</button>
+      <!-- ---- path 1: play on screen ---- -->
+      <section class="path-card">
+        <div class="path-head">
+          <span class="path-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22"><rect x="1.6" y="3" width="20.8" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 20.5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="10" r="3" fill="currentColor"/></svg>
+          </span>
+          <div>
+            <h2>Play on screen</h2>
+            <p>Roll, aim and score right here.</p>
           </div>
-          <p class="hint">One hole per page, ready to print.</p>
         </div>
-      </div>
 
-      <details class="rules" open>
-        <summary>How to play</summary>
-        <div class="rules-body">
-          <p><b>Goal.</b> Get the ball <span class="glyph">&#9675;</span> into the hole <span class="glyph">&#9679;</span>. Par is 6 on every hole; the fewest total strokes wins.</p>
-          <p><b>Dice golf.</b> Roll the die to see how far the ball travels. Add 1 when hitting from the fairway, subtract 1 when hitting from sand. Then pick one of the 8 directions and the ball flies that many dots in a straight line.</p>
-          <p><b>Speed golf.</b> No die: choose a club instead. Driver moves 6 (fairway only, can fly over trees), iron moves 3 (2 from sand, never over trees), putter moves 1.</p>
-          <p><b>Terrain.</b> Trees block your shot and can never be landed on &mdash; but a shot struck <i>from the fairway</i> sails over them. Water can be flown over, never landed in. Sand shortens your next hit. Slope arrows roll the ball one extra dot (and keep rolling across chained arrows).</p>
-          <p><b>Sinking it.</b> Land exactly on the hole and it drops. If your line crosses the hole and finishes just one dot past it, that counts too.</p>
-          <p><b>Do-overs.</b> Your first shot on each hole may be re-rolled once for free. Beyond that, each player carries 6 mulligans for the whole course &mdash; spend one to re-roll any shot. You may always choose to putt (move 1) instead of using your roll.</p>
-          <p><b>Multiplayer.</b> Everyone tees off in order; after that, whoever sits furthest from the hole shoots next. Keep an eye out &mdash; a bigfoot hides somewhere in about a third of all notebooks, and spotting him earns a bonus mulligan.</p>
+        <div class="field">
+          <label for="seed-input">Course code</label>
+          <div class="seed-row">
+            <input id="seed-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" spellcheck="false" autocomplete="off">
+            <button id="shuffle-seed" class="btn ghost" title="New random course" aria-label="New random course">&#8635;</button>
+          </div>
+          <p class="hint">Numbers only. Share the code to play the exact same 18 holes.</p>
         </div>
-      </details>
+
+        <div class="field">
+          <label>Players</label>
+          <div id="player-picker" class="segmented" role="radiogroup" aria-label="Number of players">
+            <button data-n="1" class="on">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button>
+          </div>
+          <p class="hint" id="size-hint">Solo &rarr; pocket notebook (14&times;20)</p>
+        </div>
+
+        <div class="field">
+          <label>Game mode</label>
+          <div id="mode-picker" class="segmented" role="radiogroup" aria-label="Game mode">
+            <button data-m="dice" class="on">Dice golf</button><button data-m="speed">Speed golf</button>
+          </div>
+          <p class="hint" id="mode-hint">Roll a die each shot. Fairway +1, sand &minus;1.</p>
+        </div>
+
+        <button id="start-btn" class="btn primary big path-cta">Tee off</button>
+      </section>
+
+      <!-- ---- path 2: play on paper ---- -->
+      <section class="path-card">
+        <div class="path-head">
+          <span class="path-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 9V3h12v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="2.6" y="9" width="18.8" height="7.5" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 15h12v6H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </span>
+          <div>
+            <h2>Play on paper</h2>
+            <p>Print it out. All you need is a pencil and one die.</p>
+          </div>
+        </div>
+
+        <ul class="paper-points">
+          <li>Page 1 is a friendly how-to-play and map key, so anyone can pick it up.</li>
+          <li>One hole per page, printed big enough to draw your shots on.</li>
+          <li>Every sheet carries the course code &mdash; type it in here to play the same holes on screen.</li>
+        </ul>
+
+        <div class="field">
+          <label for="pdf-range">How much to print</label>
+          <select id="pdf-range">
+            <option value="0:18">The whole course &mdash; 18 holes</option>
+            <option value="0:6">Front six &mdash; holes 1&ndash;6</option>
+            <option value="6:6">Middle six &mdash; holes 7&ndash;12</option>
+            <option value="12:6">Back six &mdash; holes 13&ndash;18</option>
+          </select>
+        </div>
+
+        <button id="pdf-btn" class="btn big path-cta">Get the printable pack</button>
+      </section>
     </div>
+
+    <details class="rules">
+      <summary>How to play</summary>
+      <div class="rules-body">
+        <p><b>Goal.</b> Get the ball <span class="glyph">&#9675;</span> into the hole <span class="glyph">&#9679;</span>. Par is 6 on every hole; the fewest total strokes wins.</p>
+        <p><b>Dice golf.</b> Roll the die to see how far the ball travels. Add 1 when hitting from the fairway, subtract 1 when hitting from sand. Then pick one of the 8 directions and the ball flies that many dots in a straight line.</p>
+        <p><b>Speed golf.</b> No die: choose a club instead. Driver moves 6 (fairway only, can fly over trees), iron moves 3 (2 from sand, never over trees), putter moves 1.</p>
+        <p><b>Terrain.</b> Trees block your shot and can never be landed on &mdash; but a shot struck <i>from the fairway</i> sails over them. Water can be flown over, never landed in. Sand shortens your next hit. Slope arrows roll the ball one extra dot (and keep rolling across chained arrows).</p>
+        <p><b>Sinking it.</b> Land exactly on the hole and it drops. If your line crosses the hole and finishes just one dot past it, that counts too.</p>
+        <p><b>Do-overs.</b> Your first shot on each hole may be re-rolled once for free. Beyond that, each player carries 6 mulligans for the whole course &mdash; spend one to re-roll any shot. You may always choose to putt (move 1) instead of using your roll.</p>
+        <p><b>Multiplayer.</b> Everyone tees off in order; after that, whoever sits furthest from the hole shoots next. Keep an eye out &mdash; a bigfoot hides somewhere in about a third of all notebooks, and spotting him earns a bonus mulligan.</p>
+      </div>
+    </details>
 
     <footer class="menu-foot">
       <button id="mute-btn" class="btn ghost small">Sound: on</button>
-      <span class="credit">build <b id="build-stamp">v8</b> &middot; an homage to pencil-and-paper golf notebooks</span>
+      <span class="credit">build <b id="build-stamp">v9</b> &middot; an homage to pencil-and-paper golf notebooks</span>
     </footer>
   </div>
 </section>
@@ -91,10 +120,10 @@
     <div class="game-title">
       <b id="course-name">Course</b>
       <span id="hole-label">Hole 1 / 18</span>
-      <span class="seed-chip" id="seed-chip" title="Course seed"></span><span class="build-tag" title="build version">v8</span>
+      <span class="seed-chip" id="seed-chip" title="Course seed"></span><span class="build-tag" title="build version">v9</span>
     </div>
     <div class="game-bar-actions">
-      <button id="pdf-btn2" class="btn ghost small">PDF</button>
+      <button id="pdf-btn2" class="btn ghost small" title="Download a printable paper version of this course">Print &amp; Play</button>
       <button id="save-btn" class="btn ghost small">Save</button>
       <button id="mute-btn2" class="btn ghost small" title="Toggle sound">&#9835;</button>
     </div>
@@ -162,12 +191,12 @@
   </div>
 </div>
 
-<script src="js/rng.js?v=8"></script>
-<script src="js/audio.js?v=8"></script>
-<script src="js/caddie.js?v=8"></script>
-<script src="js/course.js?v=8"></script>
-<script src="js/dice.js?v=8"></script>
-<script src="js/pdf.js?v=8"></script>
-<script src="js/game.js?v=8"></script>
+<script src="js/rng.js?v=9"></script>
+<script src="js/audio.js?v=9"></script>
+<script src="js/caddie.js?v=9"></script>
+<script src="js/course.js?v=9"></script>
+<script src="js/dice.js?v=9"></script>
+<script src="js/pdf.js?v=9"></script>
+<script src="js/game.js?v=9"></script>
 </body>
 </html>
