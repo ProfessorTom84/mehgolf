@@ -231,12 +231,22 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .mull-pip.used{background:var(--ink); opacity:.35}
 
 /* ---------- hover inspector ---------- */
+/* Fixed height on purpose: this strip sits between the board and the footer,
+   so if it grew or shrank with its content it would change the space available
+   to the board and make it visibly jump while the pointer moves around. */
 .board-tip{
-  border-top:2px dashed var(--graphite); margin-top:6px; padding:5px 4px 0;
-  font-size:.78rem; line-height:1.35; min-height:2.4em;
+  border-top:2px dashed var(--graphite); margin-top:6px; padding:4px 4px 0;
+  font-size:.76rem; line-height:1.3;
+  height:46px; min-height:46px; max-height:46px; overflow:hidden;
 }
 .board-tip b{display:block; letter-spacing:.04em}
-.board-tip span{color:#6a6d64}
+.board-tip span{
+  color:#6a6d64; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+/* Beat the global .hidden{display:none!important}: this strip must ALWAYS
+   occupy its 46px, or the board would be measured against a gap that appears
+   the moment the pointer touches the board. */
 .board-tip.hidden{display:block !important; visibility:hidden}
 
 /* ---------- caddie ---------- */

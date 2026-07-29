@@ -209,28 +209,33 @@
     maxW = Math.max(200, maxW);
 
     // Vertical budget: from the board's top down to the bottom of the viewport,
-    // minus the page footer strip below it and a little breathing room.
+    // minus EVERYTHING that sits below the board inside the page (the hover
+    // inspector and the footer strip) plus a little breathing room. Missing one
+    // of these pushes the footer off-screen.
     const top = $("#board-wrap").getBoundingClientRect().top;
-    const foot = document.querySelector(".page-foot");
-    const footH = foot ? foot.getBoundingClientRect().height : 0;
-    const maxH = Math.max(200, window.innerHeight - top - footH - 26);
+    let belowH = 0;
+    ["#board-tip", ".page-foot"].forEach(sel => {
+      const n = document.querySelector(sel);
+      if (n) belowH += n.getBoundingClientRect().height;
+    });
+    const maxH = Math.max(200, window.innerHeight - top - belowH - 24);
 
     const scale = Math.min(maxW / vw, maxH / vh);
-    svg.style.width = (vw * scale) + "px";
-    svg.style.height = (vh * scale) + "px";
+    const w = Math.floor(vw * scale), h = Math.floor(vh * scale);
+    // Idempotence guard: writing identical values would still dirty layout and,
+    // with any layout observer attached, could feed back into another fit.
+    if (svg.style.width === w + "px" && svg.style.height === h + "px") return;
+    svg.style.width = w + "px";
+    svg.style.height = h + "px";
   }
   let fitTimer = null;
   const scheduleFit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitBoard, 80); };
   window.addEventListener("resize", scheduleFit);
   window.addEventListener("orientationchange", scheduleFit);
-  if (window.ResizeObserver) {
-    // The history panel grows as shots are logged; refit when the columns move.
-    const ro = new ResizeObserver(scheduleFit);
-    document.addEventListener("DOMContentLoaded", () => {
-      const felt = document.querySelector(".table-felt");
-      if (felt) ro.observe(felt);
-    });
-  }
+  // NOTE: deliberately no ResizeObserver here. Observing the layout that
+  // contains the board means our own resize retriggers the observer, which
+  // oscillates the board size. The side panels are fixed-width and scroll
+  // internally, so window resize is the only signal we actually need.
 
   const jitter = () => (S.wobble() - 0.5) * 3.5;
 
