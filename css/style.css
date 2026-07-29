@@ -230,6 +230,34 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .mull-pip{display:inline-block; width:10px; height:10px; border:1.5px solid var(--ink); border-radius:2px; margin-right:3px; vertical-align:-1px}
 .mull-pip.used{background:var(--ink); opacity:.35}
 
+/* ---------- hover inspector ---------- */
+.board-tip{
+  border-top:2px dashed var(--graphite); margin-top:6px; padding:5px 4px 0;
+  font-size:.78rem; line-height:1.35; min-height:2.4em;
+}
+.board-tip b{display:block; letter-spacing:.04em}
+.board-tip span{color:#6a6d64}
+.board-tip.hidden{display:block !important; visibility:hidden}
+
+/* ---------- caddie ---------- */
+.caddie{
+  background:var(--paper-shade); border-left:3px solid var(--p3);
+  border-radius:0 8px 8px 0; padding:.5rem .7rem;
+}
+.caddie-label{
+  font-size:.62rem; text-transform:uppercase; letter-spacing:.18em; color:#6a6d64;
+}
+.caddie p{margin:.15rem 0 0; font-size:.82rem; line-height:1.45; font-style:italic}
+
+/* ---------- history extras ---------- */
+.h-die{vertical-align:-3px; margin-right:.15rem}
+.h-mod{font-size:.72rem; font-weight:700}
+.h-mod.up{color:#1F8A46}
+.h-mod.dn{color:#B4762A}
+.h-move{font-weight:700}
+.h-club{font-weight:700}
+.shot-num{pointer-events:none; user-select:none}
+
 /* ---------- banner ---------- */
 .banner{
   position:absolute; inset:0; z-index:6; display:grid; place-items:center;
@@ -244,8 +272,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 @keyframes bannerin{from{transform:translateY(16px) scale(.92); opacity:0}}
 .banner-card h2{margin:.1rem 0 .4rem; letter-spacing:.06em}
 .banner-card p{margin:.2rem 0; font-size:.9rem}
-.banner-card .btn{margin-top:.8rem}
-.banner-card .btn + .btn{margin-left:.6rem}
+.banner-actions{display:flex; flex-direction:column; gap:.5rem; margin-top:.9rem; align-items:stretch}
+.banner-actions .btn{width:100%}
 
 /* ---------- modal ---------- */
 .modal{position:fixed; inset:0; background:rgba(20,22,25,.55); display:grid; place-items:center; z-index:20; padding:1rem}

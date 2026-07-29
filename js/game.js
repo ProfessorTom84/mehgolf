@@ -176,6 +176,7 @@
     wrap.innerHTML = "";
     wrap.appendChild(svg);
     svg.dataset.vw = w; svg.dataset.vh = h;
+    wireHover(svg);
     fitBoard();
     drawTrails(); drawBalls();
   }
@@ -244,6 +245,22 @@
           opacity: seg.kind === "slope" ? .55 : .9,
           "stroke-dasharray": seg.kind === "slope" ? "2 6" : "none"
         }, t);
+      });
+      // A numbered node at the end of every struck shot. Without these, three
+      // 2-dot hits in a row look identical to one 6-dot hit.
+      let n = 0;
+      p.trail.forEach(seg => {
+        if (seg.kind === "slope") return;      // rolls aren't strokes
+        n++;
+        const cx = px(seg.b.x) + seg.j2x, cy = px(seg.b.y) + seg.j2y;
+        const isLast = n === p.trail.filter(s => s.kind !== "slope").length;
+        if (isLast && !p.holed) return;        // the live ball marker sits here
+        el("circle", { cx, cy, r: 7.5, fill: "#FAF8F2", stroke: p.color, "stroke-width": 2, opacity: .95 }, t);
+        el("text", {
+          x: cx, y: cy + 3.4, "text-anchor": "middle", "font-size": 9,
+          "font-family": "Courier New, monospace", "font-weight": "700",
+          fill: p.color, class: "shot-num"
+        }, t).textContent = n;
       });
     });
   }
@@ -379,6 +396,7 @@
   }
 
   function endOfShot(justHoled) {
+    drawTrails(); drawBalls();   // repaint so the numbered shot markers appear
     updateFoot();
     if (S.ps.every(p => p.holed)) return holeComplete();
     nextPlayer();
@@ -520,6 +538,127 @@
     [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
   }
 
+  /* ---------------- hover inspector ---------------- */
+  const TERRAIN_INFO = {
+    [T.ROUGH]: ["Rough", "Plain ground. No bonus, no penalty."],
+    [T.FAIR]:  ["Fairway", "Hit from here and the ball travels 1 dot further \u2014 and flies over trees."],
+    [T.SAND]:  ["Sand trap", "Hit from here and the ball travels 1 dot shorter. An iron only carries 2."],
+    [T.WATER]: ["Water", "You may fly over it, but never land in it."],
+    [T.TREE]:  ["Tree", "Blocks the shot and can never be landed on \u2014 unless you strike from the fairway or use a driver."]
+  };
+
+  function describeCell(x, y) {
+    const G = g();
+    if (!inB(G, x, y)) return null;
+    const c = cell(G, x, y);
+    if (G.hole.x === x && G.hole.y === y)
+      return ["The cup", "Land exactly here, or cross it and stop one dot past, to sink the ball."];
+    if (G.tee.x === x && G.tee.y === y)
+      return ["The tee", "Where this hole starts. Your first shot may be re-rolled once for free."];
+    const bf = S.course.bigfoot;
+    if (bf && bf.hole === S.holeIdx && !S.bigfootFound && bf.x === x && bf.y === y)
+      return ["Something in the grass\u2026", "Click it. You might be glad you did."];
+    for (const p of S.ps) {
+      if (p.pos.x === x && p.pos.y === y && !p.holed)
+        return [p.name + "'s ball", "Currently lying on " + lieName(c.t) + "."];
+    }
+    if (c.slope >= 0) {
+      const dn = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][c.slope];
+      return ["Slope \u2014 runs " + dn, "A ball landing here rolls one dot " + dn + ", and keeps rolling across any slope it meets."];
+    }
+    return TERRAIN_INFO[c.t] || null;
+  }
+
+  function wireHover(svg) {
+    const tip = $("#board-tip");
+    if (!tip) return;
+    let cur = "";
+    svg.addEventListener("mousemove", e => {
+      const pt = svg.getBoundingClientRect();
+      const sx = (e.clientX - pt.left) / pt.width * (Number(svg.dataset.vw) || 1);
+      const sy = (e.clientY - pt.top) / pt.height * (Number(svg.dataset.vh) || 1);
+      const x = Math.floor(sx / C), y = Math.floor(sy / C);
+      const info = describeCell(x, y);
+      const key = info ? x + "," + y : "";
+      if (key === cur) return;
+      cur = key;
+      if (!info) { tip.classList.add("hidden"); return; }
+      tip.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`;
+      tip.classList.remove("hidden");
+    });
+    svg.addEventListener("mouseleave", () => { cur = ""; $("#board-tip").classList.add("hidden"); });
+  }
+
+  /* ---------------- caddie chatter ---------------- */
+  const CADDIE = {
+    tee: [
+      "New hole, clean scorecard. The notebook forgets everything.",
+      "Somewhere out there is a par. Go introduce yourself.",
+      "The tee box: the only place on this course where nothing has gone wrong yet.",
+      "Aim small, miss small. Or aim big and tell everyone you meant it.",
+      "Every great round starts with one unremarkable shot."
+    ],
+    fairway: [
+      "You're on the short grass. The die owes you a big one.",
+      "Fairway means the ball runs an extra dot — and sails clean over the pines.",
+      "This is the good stuff. Don't overthink it.",
+      "From here you can fly the trees. Use that while you have it."
+    ],
+    sand: [
+      "Sand costs you a dot. Consider it a tax on ambition.",
+      "The bunker: nature's way of asking if you were paying attention.",
+      "Play the escape, not the hero shot. Out is better than close.",
+      "Every golfer leaves a little something in the sand. Usually their scorecard."
+    ],
+    rough: [
+      "The rough is honest, at least. No bonus, no penalty, no sympathy.",
+      "Nothing helping you here, but nothing hurting you either.",
+      "Plain ground. The die decides everything from here.",
+      "A modest lie for a modest shot. There's no shame in modest."
+    ],
+    close: [
+      "You're a whisker away. Remember: one dot past still drops.",
+      "Short game time. This is where notebooks are won.",
+      "Close enough to smell it. Don't get greedy with the line.",
+      "A putt moves exactly 1. Sometimes that's the whole trick."
+    ],
+    trouble: [
+      "Awkward spot. Take your medicine and move on.",
+      "Getting out is a fine ambition right now.",
+      "The bold line is a trap. The boring line is a score.",
+      "Somewhere, a mulligan is quietly clearing its throat."
+    ],
+    deep: [
+      "This hole has become a character-building exercise.",
+      "Par is a memory. Let's aim for dignity.",
+      "Six strokes in and still writing. That's commitment.",
+      "The pencil is getting shorter. So is the patience."
+    ]
+  };
+
+  function caddieLine(p) {
+    const rng = RNG.rngFor(S.seed + "|caddie|" + S.holeIdx + "|" + S.cur + "|" + p.strokes);
+    let pool;
+    const t = terrainAt(p.pos);
+    const d = Math.max(Math.abs(p.pos.x - g().hole.x), Math.abs(p.pos.y - g().hole.y));
+    if (p.strokes >= 7) pool = CADDIE.deep;
+    else if (p.strokes === 0) pool = CADDIE.tee;
+    else if (d <= 2) pool = CADDIE.close;
+    else if (t === T.SAND) pool = CADDIE.sand;
+    else if (t === T.FAIR) pool = CADDIE.fairway;
+    else if (d >= 12) pool = CADDIE.trouble;
+    else pool = CADDIE.rough;
+    return RNG.pick(rng, pool);
+  }
+
+  function updateCaddie() {
+    const box = $("#caddie");
+    if (!box) return;
+    if (S.phase === "over") { box.classList.add("hidden"); return; }
+    box.classList.remove("hidden");
+    box.innerHTML = `<span class="caddie-label">Caddie</span><p>${caddieLine(P())}</p>`;
+  }
+
   /* ---------------- shot history ---------------- */
   const DIR_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
@@ -560,6 +699,18 @@
     renderHistory();
   }
 
+  // A little inline die showing the exact face that was rolled.
+  const DIE_PIPS = { 1:[[8,8]], 2:[[4,4],[12,12]], 3:[[4,4],[8,8],[12,12]],
+    4:[[4,4],[12,4],[4,12],[12,12]], 5:[[4,4],[12,4],[8,8],[4,12],[12,12]],
+    6:[[4,4],[12,4],[4,8],[12,8],[4,12],[12,12]] };
+  function dieGlyph(v, color) {
+    const pips = (DIE_PIPS[v] || []).map(([x, y]) =>
+      `<circle cx="${x}" cy="${y}" r="1.6" fill="${color || "#24262B"}"/>`).join("");
+    return `<svg class="h-die" viewBox="0 0 16 16" width="15" height="15" aria-label="rolled ${v}">` +
+      `<rect x="0.8" y="0.8" width="14.4" height="14.4" rx="3.2" fill="#FAF8F2" stroke="#24262B" stroke-width="1.3"/>` +
+      pips + `</svg>`;
+  }
+
   function renderHistory() {
     const box = $("#history-list");
     if (!box) return;
@@ -583,10 +734,11 @@
           : "";
         let what;
         if (e.roll) {
-          const m = e.roll.mod > 0 ? ` +1 fairway` : e.roll.mod < 0 ? ` \u22121 sand` : "";
-          what = `rolled <b>${e.roll.die}</b>${m} \u2192 moved ${e.roll.moved} ${e.dir}`;
+          const m = e.roll.mod > 0 ? ` <span class="h-mod up">+1 fairway</span>`
+            : e.roll.mod < 0 ? ` <span class="h-mod dn">\u22121 sand</span>` : "";
+          what = `${dieGlyph(e.roll.die, e.color)}${m} <span class="h-move">\u2192 ${e.roll.moved} ${e.dir}</span>`;
         } else {
-          what = `${e.club} \u2192 moved ${e.dist} ${e.dir}`;
+          what = `<span class="h-club">${e.club}</span> <span class="h-move">\u2192 ${e.dist} ${e.dir}</span>`;
         }
         const tail = e.holed
           ? ` <span class="h-sunk">sunk in ${e.stroke}</span>`
@@ -604,39 +756,146 @@
     const live = document.getElementById("board");
     if (!live) return null;
     const vw = Number(live.dataset.vw), vh = Number(live.dataset.vh);
-    const ns = "http://www.w3.org/2000/svg";
-    const clone = live.cloneNode(true);
-    clone.removeAttribute("id"); clone.removeAttribute("style"); clone.removeAttribute("aria-label");
-    ["aim", "preview"].forEach(id => { const n = clone.querySelector("#" + id); if (n) n.remove(); }); // UI-only layers
-    clone.setAttribute("x", 0); clone.setAttribute("y", 44);
-    clone.setAttribute("width", vw); clone.setAttribute("height", vh);
-    clone.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+    const NS = "http://www.w3.org/2000/svg";
+    const mk = (tag, attrs, parent, txt) => {
+      const n = document.createElementNS(NS, tag);
+      for (const k in attrs) n.setAttribute(k, attrs[k]);
+      if (txt != null) n.textContent = txt;
+      if (parent) parent.appendChild(n);
+      return n;
+    };
+    const MONO = "Courier New, Courier, monospace";
+    const T_ = (p_, x, y, size, weight, fill, str, anchor) =>
+      mk("text", { x, y, "font-family": MONO, "font-size": size, "font-weight": weight,
+        fill, "text-anchor": anchor || "start" }, p_, str);
 
-    const headerH = 44, footerH = 26, W = vw, H = headerH + vh + footerH;
-    const svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("xmlns", ns);
+    // ---- geometry ----
+    const PAD = 26, GAP = 22, PANEL = 320;
+    const HEAD = 92, FOOT = 40;
+    const bodyH = Math.max(vh, 300);
+    const W = PAD + vw + GAP + PANEL + PAD;
+    const H = PAD + HEAD + bodyH + FOOT + PAD;
+
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("xmlns", NS);
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.setAttribute("width", W); svg.setAttribute("height", H);
 
-    const text = (x, y, size, weight, fill, str) => {
-      const t = document.createElementNS(ns, "text");
-      t.setAttribute("x", x); t.setAttribute("y", y);
-      t.setAttribute("font-family", "Courier New, monospace");
-      t.setAttribute("font-size", size); t.setAttribute("font-weight", weight); t.setAttribute("fill", fill);
-      t.textContent = str;
-      return t;
-    };
-    const bg = document.createElementNS(ns, "rect");
-    bg.setAttribute("width", W); bg.setAttribute("height", H); bg.setAttribute("fill", "#FAF8F2");
-    svg.appendChild(bg);
-    svg.appendChild(text(10, 19, 14, 700, "#24262B", `${S.course.name.toUpperCase()} \u2014 HOLE ${S.holeIdx + 1}/18`));
-    svg.appendChild(text(10, 36, 11, 400, "#6a6d64", `SEED ${S.seed}`));
-    const line = document.createElementNS(ns, "line");
-    line.setAttribute("x1", 0); line.setAttribute("y1", headerH - 6); line.setAttribute("x2", W); line.setAttribute("y2", headerH - 6);
-    line.setAttribute("stroke", "#24262B"); line.setAttribute("stroke-width", 2);
-    svg.appendChild(line);
+    // paper + dot grid + border
+    mk("rect", { width: W, height: H, fill: "#FAF8F2" }, svg);
+    const defs = mk("defs", {}, svg);
+    const pat = mk("pattern", { id: "snapdots", width: 26, height: 26, patternUnits: "userSpaceOnUse" }, defs);
+    mk("circle", { cx: 13, cy: 13, r: 1, fill: "#DCD8CC" }, pat);
+    mk("rect", { width: W, height: H, fill: "url(#snapdots)" }, svg);
+    mk("rect", { x: 8, y: 8, width: W - 16, height: H - 16, fill: "none",
+      stroke: "#24262B", "stroke-width": 2, rx: 10 }, svg);
+
+    // ---- header ----
+    const hx = PAD, hy = PAD;
+    T_(svg, hx, hy + 26, 30, 700, "#24262B", "MEH GOLF");
+    T_(svg, hx + 200, hy + 26, 15, 400, "#5b5e57", "\u00B7  " + S.course.name);
+    T_(svg, hx, hy + 50, 15, 700, "#24262B", `HOLE ${S.holeIdx + 1} OF 18`);
+    T_(svg, hx + 150, hy + 50, 13, 400, "#6a6d64", "Par 6");
+
+    // seed badge, right aligned
+    const badgeW = 190, badgeX = W - PAD - badgeW;
+    mk("rect", { x: badgeX, y: hy + 4, width: badgeW, height: 46, rx: 8,
+      fill: "#24262B" }, svg);
+    T_(svg, badgeX + badgeW / 2, hy + 22, 9, 700, "#FAF8F2", "COURSE CODE", "middle");
+    T_(svg, badgeX + badgeW / 2, hy + 42, 20, 700, "#FAF8F2", S.seed, "middle");
+
+    mk("line", { x1: PAD, y1: hy + HEAD - 16, x2: W - PAD, y2: hy + HEAD - 16,
+      stroke: "#24262B", "stroke-width": 2 }, svg);
+
+    // ---- board ----
+    const bx = PAD, by = PAD + HEAD;
+    const clone = live.cloneNode(true);
+    clone.removeAttribute("id"); clone.removeAttribute("style"); clone.removeAttribute("aria-label");
+    ["aim", "preview"].forEach(id => { const n = clone.querySelector("#" + id); if (n) n.remove(); });
+    clone.setAttribute("x", bx); clone.setAttribute("y", by);
+    clone.setAttribute("width", vw); clone.setAttribute("height", vh);
+    clone.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+    mk("rect", { x: bx - 6, y: by - 6, width: vw + 12, height: vh + 12, rx: 8,
+      fill: "#fff", stroke: "#E2DED2", "stroke-width": 1 }, svg);
     svg.appendChild(clone);
-    svg.appendChild(text(10, headerH + vh + 18, 10, 400, "#6a6d64", "MEH GOLF \u2014 enter this seed to play the same course"));
+
+    // ---- side panel ----
+    const px0 = PAD + vw + GAP, pw = PANEL;
+    let cy = by;
+
+    // scores block
+    mk("rect", { x: px0, y: cy, width: pw, height: 26 + S.ps.length * 22, rx: 8,
+      fill: "#F1EEE5", stroke: "#24262B", "stroke-width": 1.5 }, svg);
+    T_(svg, px0 + 12, cy + 17, 10, 700, "#6a6d64", "THIS HOLE");
+    S.ps.forEach((p, i) => {
+      const ry = cy + 38 + i * 22;
+      mk("circle", { cx: px0 + 18, cy: ry - 4, r: 5, fill: p.color }, svg);
+      T_(svg, px0 + 32, ry, 13, 700, "#24262B", p.name);
+      const sc = p.scores[S.holeIdx];
+      T_(svg, px0 + pw - 12, ry, 13, 700, "#24262B",
+        (sc == null ? p.strokes + " so far" : sc + " strokes"), "end");
+    });
+    cy += 26 + S.ps.length * 22 + 16;
+
+    // history
+    T_(svg, px0 + 2, cy + 10, 10, 700, "#6a6d64", "SHOT HISTORY");
+    mk("line", { x1: px0, y1: cy + 18, x2: px0 + pw, y2: cy + 18,
+      stroke: "#24262B", "stroke-width": 1.5 }, svg);
+    cy += 34;
+
+    const rows = S.log.filter(e => e.hole === S.holeIdx);
+    const ROW = 26, avail = by + bodyH - cy - 6;
+    const maxRows = Math.max(1, Math.floor(avail / ROW));
+    const shown = rows.slice(0, maxRows);
+    const multi = S.ps.length > 1;
+
+    shown.forEach((e, i) => {
+      const ry = cy + i * ROW;
+      if (i % 2 === 0) mk("rect", { x: px0 - 4, y: ry - 13, width: pw + 8, height: ROW,
+        fill: "#F5F2EA", rx: 4 }, svg);
+      let tx = px0 + 2;
+      T_(svg, tx, ry, 11, 700, "#A8A59A", e.stroke + ".");
+      tx += 20;
+      if (e.roll) {
+        // draw the actual die face
+        const dg = mk("g", { transform: `translate(${tx},${ry - 13})` }, svg);
+        mk("rect", { width: 17, height: 17, rx: 4, fill: "#fff",
+          stroke: "#24262B", "stroke-width": 1.4 }, dg);
+        (DIE_PIPS[e.roll.die] || []).forEach(([qx, qy]) =>
+          mk("circle", { cx: qx * 17 / 16, cy: qy * 17 / 16, r: 1.8, fill: e.color }, dg));
+        tx += 24;
+        if (e.roll.mod) {
+          T_(svg, tx, ry, 10, 700, e.roll.mod > 0 ? "#1F8A46" : "#B4762A",
+            e.roll.mod > 0 ? "+1" : "\u22121");
+          tx += 20;
+        }
+        T_(svg, tx, ry, 12, 700, "#24262B", `\u2192 ${e.roll.moved} ${e.dir}`);
+      } else {
+        T_(svg, tx, ry, 11, 700, "#24262B", e.club);
+        tx += 52;
+        T_(svg, tx, ry, 12, 700, "#24262B", `\u2192 ${e.dist} ${e.dir}`);
+      }
+      const tail = e.holed ? "sunk" : e.lie;
+      T_(svg, px0 + pw - 2, ry, 11, e.holed ? 700 : 400,
+        e.holed ? "#1F8A46" : "#8a8d84", tail, "end");
+      if (multi) {
+        mk("circle", { cx: px0 + pw - 4, cy: ry - 15, r: 3, fill: e.color }, svg);
+      }
+    });
+    if (!rows.length) {
+      T_(svg, px0 + 2, cy + 4, 12, 400, "#a3a096", "No shots recorded.");
+    } else if (rows.length > shown.length) {
+      T_(svg, px0 + 2, cy + shown.length * ROW + 6, 11, 400, "#8a8d84",
+        `+ ${rows.length - shown.length} more shots`);
+    }
+
+    // ---- footer ----
+    const fy = PAD + HEAD + bodyH + 24;
+    mk("line", { x1: PAD, y1: fy - 16, x2: W - PAD, y2: fy - 16,
+      stroke: "#C6C2B8", "stroke-width": 1.5 }, svg);
+    T_(svg, PAD, fy + 2, 12, 700, "#24262B", "Play this exact course:");
+    T_(svg, PAD + 210, fy + 2, 12, 400, "#5b5e57", `enter code ${S.seed} on the title screen`);
+    T_(svg, W - PAD, fy + 2, 10, 400, "#a3a096", "meh golf", "end");
     return svg;
   }
 
@@ -729,6 +988,7 @@
     $("#turn-player .dot").style.background = p.color;
     $("#turn-player .nm").textContent = p.name;
     $("#turn-lie").textContent = p.strokes === 0 ? "teeing off" : "on " + lieName(terrainAt(p.pos)) + ` \u00B7 stroke ${p.strokes + 1}`;
+    updateCaddie();
   }
 
   function updateMulligans() {
@@ -756,9 +1016,12 @@
     b.classList.remove("hidden");
     b.innerHTML = `<div class="banner-card">${html}</div>`;
     const card = b.querySelector(".banner-card");
-    if (showSave) card.appendChild(btn("Save board image", "ghost small", downloadBoardImage));
+    const acts = document.createElement("div");
+    acts.className = "banner-actions";
+    card.appendChild(acts);
     const button = btn(btnLabel, "primary", fn);
-    card.appendChild(button);
+    acts.appendChild(button);                     // primary action first
+    if (showSave) acts.appendChild(btn("\u2193 Save this hole (image)", "", downloadBoardImage));
     button.focus();
   }
   function hideBanner() { $("#banner").classList.add("hidden"); }
@@ -789,7 +1052,7 @@
       [sw(`<circle cx="17" cy="17" r="2" fill="#C6C2B8"/>`), "Rough", "Plain ground — no bonus or penalty."],
       [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#F0E8D2"/><line x1="4" y1="30" x2="30" y2="4" stroke="#D9CBA4" stroke-width="2"/>`), "Sand", "\u22121 to your next roll's distance."],
       [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#969C9F"/>`), "Water", "May fly over it, never land in it."],
-      [sw(`<polygon points="17,6 26,24 8,24" fill="#3A3F3A"/><rect x="15.4" y="24" width="3.2" height="4" fill="#3A3F3A"/>`), "Trees", "Block the shot \u2014 unless struck from the fairway (or a driver), which flies over."],
+      [sw(`<polygon points="11,7 18,23 4,23" fill="#3A3F3A"/><rect x="9.6" y="23" width="2.8" height="4" fill="#3A3F3A"/><circle cx="25" cy="14" r="7" fill="#3A3F3A"/><rect x="23.6" y="20" width="2.8" height="6" fill="#3A3F3A"/>`), "Trees (two shapes)", "Pines \u25B2 and broadleafs \u25CF are the same thing \u2014 both are trees. They block the shot unless struck from the fairway (or with a driver), which flies over."],
       [sw(`<g transform="translate(17,17) rotate(45)"><polygon points="0,-8 7,6 0,2.5 -7,6" fill="#6B6F66"/></g>`), "Slope", "Rolls the ball one extra dot in the arrow's direction, chaining into any slope it lands on."],
       [sw(`<circle cx="17" cy="17" r="7.5" fill="#FAF8F2" stroke="#24262B" stroke-width="3"/>`), "Tee", "Where every hole starts."],
       [sw(`<circle cx="17" cy="17" r="8" fill="#24262B"/><circle cx="19.5" cy="14.5" r="1.8" fill="#FAF8F2" opacity=".5"/>`), "Cup", "Land exactly on it, or cross it and stop one dot past, to sink your ball."],
