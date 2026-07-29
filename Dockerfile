@@ -6,7 +6,8 @@ COPY index.html /usr/share/nginx/html/
 COPY css /usr/share/nginx/html/css
 COPY js /usr/share/nginx/html/js
 
-# Light nginx tuning: cache static assets, gzip text
+# nginx tuning: gzip text, and DO NOT let browsers cache app code —
+# stale JS after a redeploy is worse than a few extra revalidation requests.
 RUN printf 'server {\n\
   listen 80;\n\
   server_name _;\n\
@@ -17,7 +18,8 @@ RUN printf 'server {\n\
   add_header X-Content-Type-Options "nosniff" always;\n\
   add_header Referrer-Policy "no-referrer" always;\n\
   add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"'; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data:; connect-src '"'"'none'"'"'; object-src '"'"'none'"'"'; frame-ancestors '"'"'none'"'"'; base-uri '"'"'self'"'"'" always;\n\
-  location ~* \\.(css|js)$ { expires 7d; add_header Cache-Control "public"; }\n\
+  location ~* \\.(css|js)$ { add_header Cache-Control "no-cache, must-revalidate" always; }\n\
+  location = /index.html { add_header Cache-Control "no-store" always; }\n\
   location / { try_files $uri $uri/ /index.html; }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 

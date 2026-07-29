@@ -14,12 +14,14 @@ No build step, no npm, no CDN calls. You can also just open `index.html` directl
 
 ## Features
 
-- **Seeded courses** — the seed string deterministically generates all 18 holes (terrain, slopes, even where the bigfoot hides). Share a seed to play identical courses on different machines.
+- **Shot history** — a running log beside the board records every shot: the die face, the terrain modifier, distance, direction, and where the ball ended up. In multiplayer each line is tagged with the player's name and color.
+- **Legend** — an in-game panel explaining every symbol on the map.
+- **Seeded courses** — the numeric seed code deterministically generates all 18 holes (terrain, slopes, even where the bigfoot hides). Share a seed to play identical courses on different machines.
 - **Two rule sets** — Dice golf (roll a d6; fairway +1, sand −1) and Speed golf (driver 6 / iron 3 / putter 1).
 - **Local multiplayer** — 1–4 players, pass-and-play. Solo uses the pocket 14×20 grid; 2+ players get the XL 18×26 grid. After tee-off, the player furthest from the cup always shoots next.
 - **Physical dice** — a CSS-3D die tumbles and bounces across the notebook page with clatter sounds, then settles on the result.
 - **Terrain rules** — fairway, rough, sand, water, trees (pines and broadleafs), chained slope arrows, exact-landing or overshoot-by-one sinking, tee re-rolls, and 6 mulligans per player per course.
-- **Print & play PDF** — downloads a hand-built single-page vector PDF (US Letter) of any six holes of the current seed. No PDF library; the file is emitted byte-by-byte.
+- **Print & play PDF** — downloads a hand-built vector PDF (US Letter), **one hole per page** so each map is full size. No PDF library; the file is emitted byte-by-byte.
 - **All-synthesized audio** — every sound effect is generated with the Web Audio API at runtime; there are no asset files anywhere in the project.
 
 ## Project layout

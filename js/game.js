@@ -18,7 +18,8 @@
     phase: "idle",             // roll | rolled | aim | anim | between | over
     rolled: 0, moveN: 0, moveKind: "roll", // roll|putt|driver|iron
     bigfootFound: false,
-    wobble: null               // seeded rng for hand-drawn jitter
+    wobble: null,              // seeded rng for hand-drawn jitter
+    log: []                    // shot history
   };
 
   /* ---------------- helpers ---------------- */
@@ -187,25 +188,48 @@
     const vw = Number(svg.dataset.vw), vh = Number(svg.dataset.vh);
     if (!vw || !vh) return;
 
-    const isNarrow = window.innerWidth <= 900;
-    const maxW = Math.min(window.innerWidth * (isNarrow ? 0.92 : 0.62), 560);
+    const stacked = window.innerWidth <= 980;
+
+    // Horizontal budget: measure what the columns actually leave us rather than
+    // guessing with a vw fraction, so the side panels can never squeeze the board
+    // off-screen.
+    let maxW;
+    if (stacked) {
+      maxW = Math.min(window.innerWidth * 0.92, 560);
+    } else {
+      const felt = document.querySelector(".table-felt");
+      const hist = document.querySelector(".history");
+      const tray = document.querySelector(".tray");
+      const feltW = felt ? felt.clientWidth : window.innerWidth;
+      const sideW = (hist ? hist.getBoundingClientRect().width : 0)
+        + (tray ? tray.getBoundingClientRect().width : 0);
+      maxW = Math.min(feltW - sideW - 66, 560); // 66 = column gaps + page padding
+    }
+    maxW = Math.max(200, maxW);
 
     // Vertical budget: from the board's top down to the bottom of the viewport,
     // minus the page footer strip below it and a little breathing room.
     const top = $("#board-wrap").getBoundingClientRect().top;
     const foot = document.querySelector(".page-foot");
     const footH = foot ? foot.getBoundingClientRect().height : 0;
-    const maxH = Math.max(220, window.innerHeight - top - footH - 28);
+    const maxH = Math.max(200, window.innerHeight - top - footH - 26);
 
     const scale = Math.min(maxW / vw, maxH / vh);
     svg.style.width = (vw * scale) + "px";
     svg.style.height = (vh * scale) + "px";
   }
   let fitTimer = null;
-  window.addEventListener("resize", () => {
-    clearTimeout(fitTimer);
-    fitTimer = setTimeout(fitBoard, 100);
-  });
+  const scheduleFit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitBoard, 80); };
+  window.addEventListener("resize", scheduleFit);
+  window.addEventListener("orientationchange", scheduleFit);
+  if (window.ResizeObserver) {
+    // The history panel grows as shots are logged; refit when the columns move.
+    const ro = new ResizeObserver(scheduleFit);
+    document.addEventListener("DOMContentLoaded", () => {
+      const felt = document.querySelector(".table-felt");
+      if (felt) ro.observe(felt);
+    });
+  }
 
   const jitter = () => (S.wobble() - 0.5) * 3.5;
 
@@ -252,7 +276,8 @@
         tabindex: r.ok ? 0 : -1, role: "button",
         "aria-label": r.ok ? "hit " + n : (r.reason || "blocked")
       }, aim);
-      el("polygon", { points: "0,-11 8,7 0,3 -8,7" }, grp);
+      el("circle", { class: "hit", cx: 0, cy: 0, r: 15 }, grp); // generous click/tap target
+      el("polygon", { class: "head", points: "0,-11 8,7 0,3 -8,7" }, grp);
       el("title", {}, grp).textContent = r.ok ? `Hit ${n} this way` : (r.reason || "blocked");
       if (r.ok) {
         any = true;
@@ -312,6 +337,7 @@
     p.strokes++;
     (kind === "putt" ? SFX.putt : SFX.hit)();
     const from = { ...p.pos };
+    logShot(p, kind, from, r);
     animateSegment(from, r.land, kind, p.color, () => {
       p.pos = { ...r.land };
       drawBalls();
@@ -492,6 +518,85 @@
   }
   function markClub(row, i) {
     [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
+  }
+
+  /* ---------------- shot history ---------------- */
+  const DIR_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+  function dirName(from, to) {
+    const dx = Math.sign(to.x - from.x), dy = Math.sign(to.y - from.y);
+    const i = window.Course.DIRS.findIndex(d => d.x === dx && d.y === dy);
+    return i >= 0 ? DIR_NAMES[i] : "";
+  }
+
+  function logShot(p, kind, from, r) {
+    const clubName = kind === "driver" ? "Driver" : kind === "iron" ? "Iron"
+      : kind === "putt" ? "Putt" : "Hit";
+    // For dice golf record the raw die face AND the terrain modifier, so the
+    // history explains why the ball travelled the distance it did.
+    let roll = null;
+    if (kind === "roll") {
+      const fromT = terrainAt(from);
+      roll = {
+        die: S.rolled,
+        mod: fromT === T.FAIR ? 1 : fromT === T.SAND ? -1 : 0,
+        moved: S.moveN
+      };
+    }
+    S.log.push({
+      hole: S.holeIdx,
+      pi: S.cur,
+      name: p.name,
+      color: p.color,
+      stroke: p.strokes,
+      club: clubName,
+      roll,
+      dir: dirName(from, r.land),
+      dist: Math.max(Math.abs(r.land.x - from.x), Math.abs(r.land.y - from.y)),
+      lie: lieName(terrainAt(r.land)),
+      holed: !!r.holed,
+      note: r.overshoot ? "rattled in from one past" : ""
+    });
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const box = $("#history-list");
+    if (!box) return;
+    if (!S.log.length) {
+      box.innerHTML = `<p class="history-empty">Every shot you take gets written down here.</p>`;
+      return;
+    }
+    const multi = S.ps.length > 1;
+    let html = "", lastHole = -1;
+    // newest hole first so the current action is always visible without scrolling
+    const byHole = new Map();
+    S.log.forEach(e => {
+      if (!byHole.has(e.hole)) byHole.set(e.hole, []);
+      byHole.get(e.hole).push(e);
+    });
+    [...byHole.keys()].sort((a, b) => b - a).forEach(h => {
+      html += `<div class="history-hole"><div class="history-hole-h">Hole ${h + 1}</div>`;
+      byHole.get(h).slice().reverse().forEach(e => {
+        const who = multi
+          ? `<span class="h-who" style="color:${e.color}">\u25CF ${e.name}</span> `
+          : "";
+        let what;
+        if (e.roll) {
+          const m = e.roll.mod > 0 ? ` +1 fairway` : e.roll.mod < 0 ? ` \u22121 sand` : "";
+          what = `rolled <b>${e.roll.die}</b>${m} \u2192 moved ${e.roll.moved} ${e.dir}`;
+        } else {
+          what = `${e.club} \u2192 moved ${e.dist} ${e.dir}`;
+        }
+        const tail = e.holed
+          ? ` <span class="h-sunk">sunk in ${e.stroke}</span>`
+          : ` <span class="h-lie">\u2192 ${e.lie}</span>`;
+        html += `<div class="history-row">${who}<span class="h-n">${e.stroke}.</span> ${what}${tail}${e.note ? ` <i>(${e.note})</i>` : ""}</div>`;
+      });
+      html += `</div>`;
+    });
+    box.innerHTML = html;
+    box.scrollTop = 0;
   }
 
   /* ---------------- board snapshot download ---------------- */
@@ -702,7 +807,9 @@
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
     // a raw PDF byte stream, and a download filename.
-    const raw = $("#seed-input").value.trim().toUpperCase().replace(/[^A-Z0-9 _\-]/g, "");
+    // Seeds are digits only: easy to read aloud, type on a phone, and safe to
+    // interpolate into HTML, the PDF byte stream, and a download filename.
+    const raw = $("#seed-input").value.replace(/[^0-9]/g, "").slice(0, 10);
     S.seed = raw || RNG.randSeedCode();
     $("#seed-input").value = S.seed;
     S.size = S.players === 1 ? "pocket" : "xl";
@@ -714,6 +821,8 @@
     S.course = genCourse(S.seed, S.size);
     S.holeIdx = 0;
     S.bigfootFound = false;
+    S.log = [];
+    renderHistory();
     S.ps = Array.from({ length: S.players }, (_, i) => ({
       name: S.players === 1 ? "You" : PNAMES[i],
       color: PCOLORS[i],
@@ -760,7 +869,8 @@
     $("#pdf-btn").addEventListener("click", () => {
       readMenu();
       const course = genCourse(S.seed, S.size);
-      PDF.downloadCoursePDF(course, +$("#pdf-range").value);
+      const [ps, pc] = $("#pdf-range").value.split(":").map(Number);
+      PDF.downloadCoursePDF(course, ps, pc);
       SFX.page();
     });
 
@@ -782,7 +892,7 @@
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });
     $("#pdf-btn2").addEventListener("click", () => {
-      PDF.downloadCoursePDF(S.course, Math.floor(S.holeIdx / 6) * 6);
+      PDF.downloadCoursePDF(S.course, 0, 18);
       SFX.page();
     });
     document.addEventListener("keydown", e => {

@@ -88,51 +88,75 @@
     d.fillG(0.05); d.circle(hx2, hy2, cs * 0.34);
   }
 
-  /** Build and download a one-page PDF for holes [start..start+5] of a course. */
-  function downloadCoursePDF(course, start) {
+  /** Draw one full page for a single hole. Returns the page's content stream. */
+  function buildHolePage(course, hIdx) {
     const d = makeOps();
-    const M = 36;
+    const M = 40;
+    const g = course.holes[hIdx];
 
     // header
     d.fillG(0.05);
-    d.text(M, 44, 20, "MEH GOLF", true);
-    d.text(M + 118, 44, 11, "--  " + course.name);
-    d.text(M, 60, 8, "Seed: " + course.seed + "   Par 6 every hole   O = tee, solid dot = cup.   Print, grab a pencil and a d6, play.");
-    d.strokeG(0.05); d.lw(1.4); d.line(M, 68, PW - M, 68);
+    d.text(M, 46, 22, "MEH GOLF", true);
+    d.text(M + 132, 46, 12, "--  " + course.name);
+    d.text(M, 64, 9, "Seed: " + course.seed + "     Par 6     O = tee, solid dot = cup");
+    d.strokeG(0.05); d.lw(1.4); d.line(M, 72, PW - M, 72);
 
-    const g0 = course.holes[0];
-    const gridW = (PW - M * 2 - 24) / 2;         // two columns
-    const gridH = (PH - 96 - M - 2 * 16) / 3;    // three rows
-    const cs = Math.min(gridW / g0.cols, (gridH - 16) / g0.rows);
+    // big hole number + scorebox on one line under the rule
+    d.fillG(0.05);
+    d.text(M, 100, 26, "HOLE " + (hIdx + 1), true);
+    d.text(M + 150, 100, 12, "Strokes: ______ / 6      Running total: ______");
 
-    for (let i = 0; i < 6; i++) {
-      const hIdx = start + i;
-      const g = course.holes[hIdx];
-      const col = i % 2, row = (i / 2) | 0;
-      const x0 = M + col * (gridW + 24) + (gridW - cs * g.cols) / 2;
-      const y0 = 80 + row * (gridH + 16);
-      drawHoleMap(d, g, x0, y0, cs);
-      d.fillG(0.05);
-      d.text(x0, y0 + cs * g.rows + 11, 9, `Hole ${hIdx + 1}   Strokes: ____ /6   Total: ____`, true);
-      if (course.bigfoot && course.bigfoot.hole === hIdx) {
-        // he's printed too — a tiny pair of footprints
-        const bx = x0 + course.bigfoot.x * cs + cs / 2, by = y0 + course.bigfoot.y * cs + cs / 2;
-        d.fillG(0.1);
-        d.circle(bx - cs * 0.12, by, cs * 0.12);
-        d.circle(bx + cs * 0.12, by - cs * 0.1, cs * 0.12);
-      }
+    // the map gets the whole rest of the page
+    const availW = PW - M * 2;
+    const top = 118, bottom = PH - 52;
+    const availH = bottom - top;
+    const cs = Math.min(availW / g.cols, availH / g.rows);
+    const x0 = M + (availW - cs * g.cols) / 2;
+    const y0 = top + (availH - cs * g.rows) / 2;
+    drawHoleMap(d, g, x0, y0, cs);
+
+    if (course.bigfoot && course.bigfoot.hole === hIdx) {
+      const bx = x0 + course.bigfoot.x * cs + cs / 2, by = y0 + course.bigfoot.y * cs + cs / 2;
+      d.fillG(0.1);
+      d.circle(bx - cs * 0.12, by, cs * 0.12);
+      d.circle(bx + cs * 0.12, by - cs * 0.1, cs * 0.12);
     }
-    d.text(M, PH - 22, 7, "meh golf -- seeded course " + course.seed + " -- holes " + (start + 1) + "-" + (start + 6));
 
-    const content = d.ops.join("\n");
-    const objects = [
-      "<< /Type /Catalog /Pages 2 0 R >>",
-      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>`,
-      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>"
-    ];
+    d.fillG(0.35);
+    d.text(M, PH - 30, 8, "meh golf -- seed " + course.seed + " -- hole " + (hIdx + 1) + " of 18");
+    return d.ops.join("\n");
+  }
+
+  /**
+   * Build and download a PDF with ONE HOLE PER PAGE.
+   * @param {object} course
+   * @param {number} start first hole index
+   * @param {number} count how many holes/pages (default 6)
+   */
+  function downloadCoursePDF(course, start, count) {
+    const n = Math.max(1, Math.min(18 - start, count == null ? 6 : count));
+    const streams = [];
+    for (let i = 0; i < n; i++) streams.push(buildHolePage(course, start + i));
+
+    // object ids: 1 catalog, 2 pages, then n page objects, then n content
+    // objects, then the two fonts.
+    const pageId = i => 3 + i;
+    const contId = i => 3 + n + i;
+    const fontA = 3 + 2 * n, fontB = fontA + 1;
+
+    const objects = [];
+    objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+    objects.push(`<< /Type /Pages /Kids [${streams.map((_, i) => pageId(i) + " 0 R").join(" ")}] /Count ${n} >>`);
+    for (let i = 0; i < n; i++) {
+      objects.push(
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Contents ${contId(i)} 0 R ` +
+        `/Resources << /Font << /F1 ${fontA} 0 R /F2 ${fontB} 0 R >> >> >>`);
+    }
+    for (let i = 0; i < n; i++) {
+      objects.push(`<< /Length ${streams[i].length} >>\nstream\n${streams[i]}\nendstream`);
+    }
+    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>");
+    objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>");
 
     let pdf = "%PDF-1.4\n";
     const offsets = [0];
@@ -148,7 +172,9 @@
     const blob = new Blob([pdf], { type: "application/pdf" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `meh-golf-${course.seed}-holes-${start + 1}-${start + 6}.pdf`;
+    a.download = n === 1
+      ? `meh-golf-${course.seed}-hole-${start + 1}.pdf`
+      : `meh-golf-${course.seed}-holes-${start + 1}-${start + n}.pdf`;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }

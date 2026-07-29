@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meh Golf</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=3">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAF8F2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%2324262B'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -23,10 +23,10 @@
       <div class="field">
         <label for="seed-input">Course seed</label>
         <div class="seed-row">
-          <input id="seed-input" type="text" maxlength="24" spellcheck="false" autocomplete="off">
+          <input id="seed-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" spellcheck="false" autocomplete="off">
           <button id="shuffle-seed" class="btn ghost" title="New random seed" aria-label="New random seed">&#8635;</button>
         </div>
-        <p class="hint">Share a seed with a friend to play the exact same 18 holes.</p>
+        <p class="hint">Numbers only. Share the code to play the exact same 18 holes.</p>
       </div>
 
       <div class="field">
@@ -52,13 +52,14 @@
           <label for="pdf-range">Print &amp; play</label>
           <div class="seed-row">
             <select id="pdf-range">
-              <option value="0">Holes 1&ndash;6</option>
-              <option value="6">Holes 7&ndash;12</option>
-              <option value="12">Holes 13&ndash;18</option>
+              <option value="0:18">All 18 holes</option>
+              <option value="0:6">Holes 1&ndash;6</option>
+              <option value="6:6">Holes 7&ndash;12</option>
+              <option value="12:6">Holes 13&ndash;18</option>
             </select>
             <button id="pdf-btn" class="btn">Download PDF</button>
           </div>
-          <p class="hint">One printable page of this seed&rsquo;s course.</p>
+          <p class="hint">One hole per page, ready to print.</p>
         </div>
       </div>
 
@@ -78,7 +79,7 @@
 
     <footer class="menu-foot">
       <button id="mute-btn" class="btn ghost small">Sound: on</button>
-      <span class="credit">an homage to pencil-and-paper golf notebooks</span>
+      <span class="credit">build <b id="build-stamp">v3</b> &middot; an homage to pencil-and-paper golf notebooks</span>
     </footer>
   </div>
 </section>
@@ -102,6 +103,11 @@
   </header>
 
   <main class="table-felt">
+    <aside class="history" id="history-panel">
+      <div class="history-head">Shot history</div>
+      <div id="history-list" class="history-list"></div>
+    </aside>
+
     <div class="notebook">
       <div class="spiral" aria-hidden="true"></div>
       <div class="page">
@@ -142,11 +148,11 @@
   </div>
 </div>
 
-<script src="js/rng.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/course.js"></script>
-<script src="js/dice.js"></script>
-<script src="js/pdf.js"></script>
-<script src="js/game.js"></script>
+<script src="js/rng.js?v=3"></script>
+<script src="js/audio.js?v=3"></script>
+<script src="js/course.js?v=3"></script>
+<script src="js/dice.js?v=3"></script>
+<script src="js/pdf.js?v=3"></script>
+<script src="js/game.js?v=3"></script>
 </body>
 </html>

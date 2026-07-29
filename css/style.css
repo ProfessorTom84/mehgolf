@@ -27,6 +27,11 @@ body{
 button{font-family:inherit;color:inherit;cursor:pointer}
 .hidden{display:none !important}
 .screen{min-height:100vh}
+/* The game screen is pinned to the viewport so the board never forces the
+   page to scroll; the board scales itself to whatever height is left. */
+#game{height:100vh; max-height:100vh; display:flex; flex-direction:column; overflow:hidden}
+#game .game-bar{flex:0 0 auto}
+#game .table-felt{flex:1 1 auto; min-height:0; overflow:hidden}
 
 /* ---------- buttons ---------- */
 .btn{
@@ -98,12 +103,35 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ---------- table ---------- */
 .table-felt{
-  display:flex; gap:1.6rem; align-items:flex-start; justify-content:center;
-  padding:0 1rem 2.5rem; flex-wrap:wrap;
+  display:flex; gap:1.2rem; align-items:flex-start; justify-content:center;
+  padding:0 1rem .6rem; flex-wrap:nowrap;
 }
 
+/* ---------- shot history ---------- */
+.history{
+  width:250px; flex:0 0 250px; min-height:0; background:var(--paper); border-radius:var(--radius);
+  box-shadow:0 18px 40px rgba(0,0,0,.4); padding:.8rem .9rem;
+  display:flex; flex-direction:column; max-height:100%;
+}
+.history-head{
+  font-size:.7rem; text-transform:uppercase; letter-spacing:.16em; color:#6a6d64;
+  border-bottom:2px solid var(--ink); padding-bottom:.4rem; margin-bottom:.5rem; flex:0 0 auto;
+}
+.history-list{overflow-y:auto; font-size:.78rem; line-height:1.45; flex:1 1 auto}
+.history-empty{color:#8a8d84; font-style:italic; margin:.2rem 0}
+.history-hole{margin-bottom:.7rem}
+.history-hole-h{
+  font-weight:700; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+  color:#6a6d64; border-bottom:1px dashed var(--graphite); margin-bottom:.25rem;
+}
+.history-row{padding:.16rem 0; border-bottom:1px dotted #e6e2d8}
+.history-row .h-n{color:#8a8d84}
+.history-row .h-who{font-weight:700}
+.history-row .h-lie{color:#8a8d84}
+.history-row .h-sunk{color:#1F8A46; font-weight:700}
+
 /* ---------- notebook ---------- */
-.notebook{position:relative; filter:drop-shadow(0 22px 30px rgba(0,0,0,.5))}
+.notebook{position:relative; filter:drop-shadow(0 22px 30px rgba(0,0,0,.5)); min-height:0; display:flex; flex-direction:column}
 .spiral{
   height:30px; margin:0 18px -6px; position:relative; z-index:3;
   background:
@@ -135,11 +163,19 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .foot-p .pip.f{background:currentColor}
 
 /* ---------- board svg ---------- */
+#board{cursor:default}
 .aim-arrow{cursor:pointer}
-.aim-arrow polygon{fill:var(--ink); opacity:.65; transition:opacity .12s, transform .12s}
-.aim-arrow:hover polygon{opacity:1}
+.aim-arrow .hit{fill:transparent}
+.aim-arrow polygon.head{
+  fill:var(--ink); opacity:.5;
+  transition:opacity .12s ease, transform .12s ease;
+  transform-origin:center; transform-box:fill-box;
+}
+.aim-arrow:hover polygon.head,
+.aim-arrow:focus-visible polygon.head{opacity:1; transform:scale(1.25)}
 .aim-arrow.blocked{cursor:not-allowed}
-.aim-arrow.blocked polygon{opacity:.14}
+.aim-arrow.blocked polygon.head{opacity:.12}
+.aim-arrow.blocked:hover polygon.head{opacity:.28; transform:none}
 .preview-line{pointer-events:none}
 .stroke-line{stroke-linecap:round}
 .ball-current{filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
@@ -170,7 +206,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ---------- tray ---------- */
 .tray{
-  width:280px; background:var(--paper); border-radius:var(--radius);
+  width:280px; max-height:100%; overflow-y:auto; background:var(--paper); border-radius:var(--radius);
   box-shadow:0 18px 40px rgba(0,0,0,.4);
   padding:1rem; display:flex; flex-direction:column; gap:.9rem;
   position:sticky; top:1rem;
@@ -228,9 +264,16 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .legend-row p{margin:.1rem 0 0; font-size:.82rem; color:#6a6d64; line-height:1.4}
 
 /* ---------- responsive ---------- */
-@media (max-width:900px){
-  .table-felt{flex-direction:column; align-items:center}
+@media (max-width:1180px){
+  .history{width:210px; flex-basis:210px}
+}
+@media (max-width:980px){
+  #game{height:auto; max-height:none; overflow:visible}
+  #game .table-felt{overflow:visible}
+  .table-felt{flex-wrap:wrap; flex-direction:column; align-items:center}
+  .history{max-height:230px}
   .tray{width:min(560px,100%); position:static}
+  .history{width:min(560px,100%); flex-basis:auto; max-height:230px; order:3}
   #board-wrap svg{width:min(92vw,560px)}
 }
 @media (prefers-reduced-motion:reduce){
