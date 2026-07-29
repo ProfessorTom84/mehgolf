@@ -20,11 +20,40 @@
     bigfootFound: false,
     wobble: null,              // seeded rng for hand-drawn jitter
     log: [],                   // shot history
-    caddieKey: "", caddieText: ""
+    caddieKey: "", caddieText: "",
+    theme: "colour"           // "colour" | "ink"
   };
 
   /* ---------------- helpers ---------------- */
   const g = () => S.course.holes[S.holeIdx];
+
+  /* ---------------- palettes ----------------
+   * "ink" reproduces the original pencil-and-paper notebook; "colour" is the
+   * same board with real terrain colours. Every fill on the board comes from
+   * here, so switching is a re-render and nothing else -- and because the
+   * values land on the SVG as plain attributes, saved PNGs pick them up too.
+   */
+  const PALETTES = {
+    ink: {
+      paper: "#FAF8F2", fairway: "#E4E2DA", water: "#969C9F",
+      sand: "#F0E8D2", sandHatch: "#D9CBA4",
+      tree: "#3A3F3A", treeAlt: "#3A3F3A", trunk: "#3A3F3A",
+      slope: "#6B6F66", green: "#DAD8CE",
+      roughDot: "#C6C2B8", fairwayDot: "#A8A59A", sandDot: "#CBBD97", waterDot: "#EDEFEF",
+      tee: "#24262B", cup: "#24262B", bigfoot: "#3A3F3A",
+      boost: "#5A5F58", penalty: "#8A8272"
+    },
+    colour: {
+      paper: "#FAF8F2", fairway: "#CFE3AE", water: "#7FB6DC",
+      sand: "#F6E7B2", sandHatch: "#E0C77E",
+      tree: "#2F6B3A", treeAlt: "#3E7C46", trunk: "#6B4E31",
+      slope: "#8A7BB5", green: "#B4D98C",
+      roughDot: "#B6BFA4", fairwayDot: "#7FA05C", sandDot: "#C9A94F", waterDot: "#DCEEF8",
+      tee: "#24262B", cup: "#24262B", bigfoot: "#4A3F35",
+      boost: "#1F8A46", penalty: "#C08528"
+    }
+  };
+  const theme = () => PALETTES[S.theme] || PALETTES.ink;
   const P = () => S.ps[S.cur];
   const terrainAt = p => cell(g(), p.x, p.y).t;
   const isHole = p => p.x === g().hole.x && p.y === g().hole.y;
@@ -118,10 +147,11 @@
     const svg = el("svg", { viewBox: `0 0 ${w} ${h}`, "aria-label": "golf hole map" });
     svg.id = "board";
 
+    const TH = theme();
     const defs = el("defs", {}, svg);
     const pat = el("pattern", { id: "sandhatch", width: 7, height: 7, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
-    el("rect", { width: 7, height: 7, fill: "#F0E8D2" }, pat);
-    el("line", { x1: 0, y1: 0, x2: 0, y2: 7, stroke: "#D9CBA4", "stroke-width": 2 }, pat);
+    el("rect", { width: 7, height: 7, fill: TH.sand }, pat);
+    el("line", { x1: 0, y1: 0, x2: 0, y2: 7, stroke: TH.sandHatch, "stroke-width": 2 }, pat);
 
     const terr = el("g", {}, svg);
     const dots = el("g", {}, svg);
@@ -129,8 +159,8 @@
 
     for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++) {
       const c = cell(G, x, y), X = x * C, Y = y * C;
-      if (c.t === T.FAIR) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: "#E4E2DA" }, terr);
-      else if (c.t === T.WATER) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: "#969C9F" }, terr);
+      if (c.t === T.FAIR) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: TH.fairway }, terr);
+      else if (c.t === T.WATER) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: TH.water }, terr);
       else if (c.t === T.SAND) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: "url(#sandhatch)" }, terr);
 
       // grid dots / features
@@ -146,17 +176,18 @@
                  `animation-duration:${(3.2 + swayR() * 1.9).toFixed(2)}s`
         }, feat);
         if (c.tree === 2) { // round tree
-          el("circle", { cx: px(x), cy: px(y) - 3, r: 8.5, fill: "#3A3F3A" }, g0);
-          el("rect", { x: px(x) - 1.8, y: px(y) + 4, width: 3.6, height: 6, fill: "#3A3F3A" }, g0);
+          el("circle", { cx: px(x), cy: px(y) - 3, r: 8.5, fill: TH.treeAlt }, g0);
+          el("rect", { x: px(x) - 1.8, y: px(y) + 4, width: 3.6, height: 6, fill: TH.trunk }, g0);
         } else { // pine
-          el("polygon", { points: `${px(x)},${px(y) - 11} ${px(x) + 9},${px(y) + 7} ${px(x) - 9},${px(y) + 7}`, fill: "#3A3F3A" }, g0);
-          el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: "#3A3F3A" }, g0);
+          el("polygon", { points: `${px(x)},${px(y) - 11} ${px(x) + 9},${px(y) + 7} ${px(x) - 9},${px(y) + 7}`, fill: TH.tree }, g0);
+          el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: TH.trunk }, g0);
         }
       } else if (c.slope >= 0) {
         const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .85 }, feat);
-        el("polygon", { points: "0,-8 7,6 0,2.5 -7,6", fill: "#6B6F66" }, a);
+        el("polygon", { points: "0,-8 7,6 0,2.5 -7,6", fill: TH.slope }, a);
       } else {
-        const col = c.t === T.WATER ? "#EDEFEF" : c.t === T.FAIR ? "#A8A59A" : c.t === T.SAND ? "#CBBD97" : "#C6C2B8";
+        const col = c.t === T.WATER ? TH.waterDot : c.t === T.FAIR ? TH.fairwayDot
+          : c.t === T.SAND ? TH.sandDot : TH.roughDot;
         const dot = el("circle", { cx: px(x), cy: px(y), r: 2, fill: col }, dots);
         if (c.t === T.WATER) {
           dot.setAttribute("class", "water-shimmer");
@@ -170,17 +201,17 @@
     if (bf && bf.hole === S.holeIdx && !S.bigfootFound) {
       const bgf = el("g", { class: "bigfoot", transform: `translate(${px(bf.x)},${px(bf.y)})`, opacity: .55 }, feat);
       el("title", {}, bgf).textContent = "…did something just move?";
-      el("ellipse", { cx: -3.5, cy: 1, rx: 3.2, ry: 5, fill: "#3A3F3A", transform: "rotate(-12)" }, bgf);
-      el("ellipse", { cx: 3.5, cy: -2, rx: 3.2, ry: 5, fill: "#3A3F3A", transform: "rotate(12)" }, bgf);
+      el("ellipse", { cx: -3.5, cy: 1, rx: 3.2, ry: 5, fill: TH.bigfoot, transform: "rotate(-12)" }, bgf);
+      el("ellipse", { cx: 3.5, cy: -2, rx: 3.2, ry: 5, fill: TH.bigfoot, transform: "rotate(12)" }, bgf);
       [[-5, -5], [-3.5, -6.2], [-2, -5.4], [2, -8.2], [3.5, -9], [5, -8]].forEach(p =>
-        el("circle", { cx: p[0], cy: p[1], r: 1.1, fill: "#3A3F3A" }, bgf));
+        el("circle", { cx: p[0], cy: p[1], r: 1.1, fill: TH.bigfoot }, bgf));
       bgf.addEventListener("click", onBigfoot);
     }
 
     // tee + cup
-    el("circle", { cx: px(G.tee.x), cy: px(G.tee.y), r: 7.5, fill: "#FAF8F2", stroke: "#24262B", "stroke-width": 3 }, feat);
-    el("circle", { cx: px(G.hole.x), cy: px(G.hole.y), r: 8, fill: "#24262B" }, feat);
-    el("circle", { cx: px(G.hole.x) + 2.5, cy: px(G.hole.y) - 2.5, r: 1.8, fill: "#FAF8F2", opacity: .5 }, feat);
+    el("circle", { cx: px(G.tee.x), cy: px(G.tee.y), r: 7.5, fill: TH.paper, stroke: TH.tee, "stroke-width": 3 }, feat);
+    el("circle", { cx: px(G.hole.x), cy: px(G.hole.y), r: 8, fill: TH.cup }, feat);
+    el("circle", { cx: px(G.hole.x) + 2.5, cy: px(G.hole.y) - 2.5, r: 1.8, fill: TH.paper, opacity: .5 }, feat);
 
     buildAmbience(svg, w, h);
     el("g", { id: "trails" }, svg);
@@ -206,108 +237,61 @@
   function buildAmbience(svg, w, h) {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const rngA = RNG.rngFor(S.seed + "|amb|" + S.holeIdx);
-    // Half the holes get a bird heading the other way, so it doesn't feel like
-    // the same loop every time.
-    const eastbound = rngA() < 0.5;
-    const x0 = eastbound ? -50 : w + 50;
-    const x1 = eastbound ? w + 50 : -50;
-    const yA = h * (0.10 + rngA() * 0.12);
-    const yB = h * (0.05 + rngA() * 0.10);
-    const yC = h * (0.12 + rngA() * 0.12);
-    const at = (t, x, y) => `${t}% { transform: translate(${x.toFixed(1)}px, ${y.toFixed(1)}px); }`;
+    const rng = RNG.rngFor(S.seed + "|amb|" + S.holeIdx);
 
+    // Nothing but wind. It reads as weather rather than as anything you are
+    // meant to interpret, which matters on a board where every dot is a square
+    // you can land on.
     const st = document.createElementNS("http://www.w3.org/2000/svg", "style");
     st.textContent = `
-      /* One slow pass, then a long rest offscreen. The crossing takes ~40s of
-         a 100s cycle, so the bird is an occasional visitor, not a metronome. */
-      @keyframes mg-bird {
-        0%   { transform: translate(${x0.toFixed(1)}px, ${yA.toFixed(1)}px); opacity: 0; }
-        3%   { opacity: .7; }
-        ${at(12, x0 + (x1 - x0) * 0.22, yB)}
-        ${at(22, x0 + (x1 - x0) * 0.44, yA)}
-        ${at(31, x0 + (x1 - x0) * 0.66, yC)}
-        37%  { opacity: .7; }
-        ${at(40, x1, yB)}
-        40.1% { opacity: 0; }
-        100% { transform: translate(${x1.toFixed(1)}px, ${yB.toFixed(1)}px); opacity: 0; }
-      }
-      /* Two lazy flaps, then a long glide. */
-      @keyframes mg-flap {
-        0%   { transform: scaleY(1); }
-        5%   { transform: scaleY(.45); }
-        11%  { transform: scaleY(1); }
-        17%  { transform: scaleY(.5); }
-        23%  { transform: scaleY(1); }
-        100% { transform: scaleY(1); }
-      }
       @keyframes mg-gust {
-        0%   { transform: translate(${-90}px, 0); opacity: 0; }
-        10%  { opacity: .42; }
-        40%  { opacity: .42; }
-        50%  { transform: translate(${(w + 90).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
-        100% { transform: translate(${(w + 90).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
+        0%   { transform: translate(${(-120).toFixed(1)}px, 0); opacity: 0; }
+        12%  { opacity: var(--gust-o, .4); }
+        62%  { opacity: var(--gust-o, .4); }
+        78%  { transform: translate(${(w + 120).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
+        100% { transform: translate(${(w + 120).toFixed(1)}px, ${(-h * 0.05).toFixed(1)}px); opacity: 0; }
       }
-      @keyframes mg-leaf {
-        0%   { transform: translate(0,0) rotate(0deg); opacity: 0; }
-        8%   { opacity: .65; }
-        90%  { opacity: .2; }
-        100% { transform: translate(${34}px, ${(h * 0.3).toFixed(1)}px) rotate(300deg); opacity: 0; }
-      }
-      .mg-bird { animation: mg-bird 100s linear infinite; }
-      .mg-wing { animation: mg-flap 3.6s ease-in-out infinite; transform-origin: center; }
-      .mg-gust { animation: mg-gust 46s linear infinite; }
-      .mg-leaf { animation: mg-leaf 15s ease-in infinite; }
+      .mg-gust { animation-name: mg-gust; animation-timing-function: linear; animation-iteration-count: infinite; }
     `;
     svg.appendChild(st);
 
     const amb = el("g", { id: "ambience", "pointer-events": "none" }, svg);
-    const rng = rngA;
 
-    // two faint wind streaks at different heights and speeds
-    for (let i = 0; i < 2; i++) {
-      const y = h * (0.2 + rng() * 0.55);
-      const g0 = el("g", { class: "mg-gust", style: `animation-delay:${(-rng() * 46).toFixed(1)}s; animation-duration:${(40 + rng() * 22).toFixed(1)}s` }, amb);
-      el("path", {
-        d: `M0 ${y.toFixed(1)} q 26 -7 52 0 t 52 0`,
-        fill: "none", stroke: "#8FA08C", "stroke-width": 1.6,
-        "stroke-linecap": "round", opacity: .5
-      }, g0);
-      el("path", {
-        d: `M14 ${(y + 9).toFixed(1)} q 20 -5 40 0`,
-        fill: "none", stroke: "#8FA08C", "stroke-width": 1.2,
-        "stroke-linecap": "round", opacity: .35
-      }, g0);
-    }
-
-    // a bird, wings flapping, crossing the page every so often
-    const bird = el("g", { class: "mg-bird", style: `animation-delay:${(-rng() * 100).toFixed(1)}s` }, amb);
-    const facing = el("g", { transform: eastbound ? "scale(1,1)" : "scale(-1,1)" }, bird);
-    const wing = el("g", { class: "mg-wing" }, facing);
-    el("path", {
-      d: "M-9 0 q 4.5 -5 9 0 q 4.5 -5 9 0",
-      fill: "none", stroke: "#4A5250", "stroke-width": 1.9,
-      "stroke-linecap": "round", "stroke-linejoin": "round"
-    }, wing);
-
-    // leaves drifting off a few of the trees
-    const trees = [];
-    const G = g();
-    for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++)
-      if (cell(G, x, y).t === T.TREE) trees.push([x, y]);
-    for (let i = 0; i < Math.min(3, trees.length); i++) {
-      const [tx, ty] = trees[(rng() * trees.length) | 0];
-      const lf = el("g", {
-        class: "mg-leaf",
-        style: `animation-delay:${(-rng() * 15).toFixed(1)}s; animation-duration:${(13 + rng() * 9).toFixed(1)}s;` +
-               `transform-origin:${px(tx)}px ${px(ty)}px`
+    // Five streaks spread down the page: different heights, lengths, speeds and
+    // weights, so it never looks like one shape on a loop.
+    const bands = [0.12, 0.29, 0.46, 0.63, 0.82];
+    bands.forEach((band, i) => {
+      const y = h * (band + (rng() - 0.5) * 0.06);
+      const len = 46 + rng() * 54;              // curl length
+      const dur = 34 + rng() * 30;              // slow drift
+      const op = 0.26 + rng() * 0.22;
+      const sw = 1.1 + rng() * 0.8;
+      const g0 = el("g", {
+        class: "mg-gust",
+        style: `--gust-o:${op.toFixed(2)}; animation-delay:${(-rng() * dur).toFixed(1)}s; ` +
+               `animation-duration:${dur.toFixed(1)}s`
       }, amb);
-      el("ellipse", {
-        cx: px(tx) + 6, cy: px(ty), rx: 3.2, ry: 1.7,
-        fill: "#6E7A63", opacity: .75,
-        transform: `rotate(-25 ${px(tx) + 6} ${px(ty)})`
-      }, lf);
-    }
+
+      // a long curl plus a shorter trailing wisp
+      el("path", {
+        d: `M0 ${y.toFixed(1)} q ${(len / 2).toFixed(1)} ${(-6 - rng() * 5).toFixed(1)} ${len.toFixed(1)} 0 ` +
+           `t ${len.toFixed(1)} 0`,
+        fill: "none", stroke: "#8FA08C", "stroke-width": sw.toFixed(2), "stroke-linecap": "round"
+      }, g0);
+      el("path", {
+        d: `M${(len * 0.3).toFixed(1)} ${(y + 8 + rng() * 5).toFixed(1)} q ${(len * 0.45).toFixed(1)} ${(-4 - rng() * 4).toFixed(1)} ${(len * 0.9).toFixed(1)} 0`,
+        fill: "none", stroke: "#8FA08C", "stroke-width": (sw * 0.7).toFixed(2),
+        "stroke-linecap": "round", opacity: .6
+      }, g0);
+      // occasional little eddy on the leading edge
+      if (i % 2 === 0) {
+        el("path", {
+          d: `M${(len * 1.6).toFixed(1)} ${y.toFixed(1)} a 5 5 0 1 1 -4 -3`,
+          fill: "none", stroke: "#8FA08C", "stroke-width": (sw * 0.8).toFixed(2),
+          "stroke-linecap": "round", opacity: .5
+        }, g0);
+      }
+    });
   }
 
   // Size the board svg to whatever space is actually available, instead of
@@ -376,31 +360,66 @@
 
   function drawTrails() {
     const t = $("#trails"); t.innerHTML = "";
+    const TH = theme();
     S.ps.forEach(p => {
       p.trail.forEach(seg => {
+        const x1 = px(seg.a.x) + seg.j1x, y1 = px(seg.a.y) + seg.j1y;
+        const x2 = px(seg.b.x) + seg.j2x, y2 = px(seg.b.y) + seg.j2y;
+
+        // A coloured casing under the stroke says what the ground did to the
+        // shot: boosted off the fairway, shortened out of sand, or neither.
+        if (seg.mod) {
+          el("line", {
+            x1, y1, x2, y2,
+            stroke: seg.mod > 0 ? TH.boost : TH.penalty,
+            "stroke-width": 8.5, "stroke-linecap": "round",
+            opacity: .4
+          }, t);
+        }
+
         el("line", {
-          x1: px(seg.a.x) + seg.j1x, y1: px(seg.a.y) + seg.j1y,
-          x2: px(seg.b.x) + seg.j2x, y2: px(seg.b.y) + seg.j2y,
+          x1, y1, x2, y2,
           stroke: p.color, "stroke-width": 3, class: "stroke-line",
           opacity: seg.kind === "slope" ? .55 : .9,
           "stroke-dasharray": seg.kind === "slope" ? "2 6" : "none"
         }, t);
+
+        // One tick per dot travelled, so the length of a shot is countable and
+        // three short hits can never be mistaken for one long one.
+        if (seg.kind !== "slope" && seg.dist > 1) {
+          const dx = (x2 - x1) / seg.dist, dy = (y2 - y1) / seg.dist;
+          const L = Math.hypot(dx, dy) || 1;
+          const nx = -dy / L * 3.6, ny = dx / L * 3.6;      // unit perpendicular
+          for (let k = 1; k < seg.dist; k++) {
+            const cx = x1 + dx * k, cy = y1 + dy * k;
+            el("line", {
+              x1: cx - nx, y1: cy - ny, x2: cx + nx, y2: cy + ny,
+              stroke: p.color, "stroke-width": 1.7, opacity: .85
+            }, t);
+          }
+        }
       });
-      // A numbered node at the end of every struck shot. Without these, three
-      // 2-dot hits in a row look identical to one 6-dot hit.
-      let n = 0;
-      p.trail.forEach(seg => {
-        if (seg.kind === "slope") return;      // rolls aren't strokes
-        n++;
+
+      // Numbered node at the end of each struck shot, with a +1/-1 chip when
+      // the terrain changed the distance.
+      const struck = p.trail.filter(s2 => s2.kind !== "slope");
+      struck.forEach((seg, i) => {
         const cx = px(seg.b.x) + seg.j2x, cy = px(seg.b.y) + seg.j2y;
-        const isLast = n === p.trail.filter(s => s.kind !== "slope").length;
-        if (isLast && !p.holed) return;        // the live ball marker sits here
-        el("circle", { cx, cy, r: 7.5, fill: "#FAF8F2", stroke: p.color, "stroke-width": 2, opacity: .95 }, t);
+        if (i === struck.length - 1 && !p.holed) return;    // live ball sits here
+        el("circle", { cx, cy, r: 7.5, fill: TH.paper, stroke: p.color, "stroke-width": 2, opacity: .95 }, t);
         el("text", {
           x: cx, y: cy + 3.4, "text-anchor": "middle", "font-size": 9,
           "font-family": "Courier New, monospace", "font-weight": "700",
           fill: p.color, class: "shot-num"
-        }, t).textContent = n;
+        }, t).textContent = i + 1;
+        if (seg.mod) {
+          const mx = (px(seg.a.x) + cx) / 2, my = (px(seg.a.y) + cy) / 2;
+          el("text", {
+            x: mx, y: my - 7, "text-anchor": "middle", "font-size": 9.5,
+            "font-family": "Courier New, monospace", "font-weight": "700",
+            fill: seg.mod > 0 ? TH.boost : TH.penalty, class: "shot-num"
+          }, t).textContent = seg.mod > 0 ? "+1" : "\u22121";
+        }
       });
     });
   }
@@ -410,7 +429,7 @@
     S.ps.forEach((p, i) => {
       if (p.holed) return;
       const grp = el("g", { class: "ball-current", id: "ball-" + i }, b);
-      el("circle", { cx: px(p.pos.x), cy: px(p.pos.y), r: 7, fill: "#FAF8F2", stroke: p.color, "stroke-width": 3.2 }, grp);
+      el("circle", { cx: px(p.pos.x), cy: px(p.pos.y), r: 7, fill: theme().paper, stroke: p.color, "stroke-width": 3.2 }, grp);
       if (i === S.cur && (S.phase === "aim" || S.phase === "rolled"))
         el("circle", { cx: px(p.pos.x), cy: px(p.pos.y), r: 12, fill: "none", stroke: p.color, "stroke-width": 1.5, "stroke-dasharray": "3 4", opacity: .8 }, grp);
     });
@@ -464,8 +483,12 @@
   /* ---------------- executing a shot ---------------- */
   function animateSegment(a, b, kind, color, done) {
     const t = $("#trails");
+    const fromT = terrainAt(a);
     const seg = {
       a, b, kind,
+      // what the ground did to this shot, so the trail can show it afterwards
+      mod: kind === "slope" ? 0 : (fromT === T.FAIR ? 1 : fromT === T.SAND ? -1 : 0),
+      dist: Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)),
       j1x: jitter(), j1y: jitter(), j2x: jitter(), j2y: jitter()
     };
     P().trail.push(seg);
@@ -695,8 +718,14 @@
   function renderLegend() {
     const box = $("#legend-inline");
     if (!box) return;
+    const TH = theme();
+    const paint = str => str
+      .replace(/#E4E2DA/g, TH.fairway).replace(/#C6C2B8/g, TH.roughDot)
+      .replace(/#F0E8D2/g, TH.sand).replace(/#D9CBA4/g, TH.sandHatch)
+      .replace(/#969C9F/g, TH.water).replace(/#3A3F3A/g, TH.tree)
+      .replace(/#6B6F66/g, TH.slope);
     box.innerHTML = LEGEND_ROWS.map(([icon, name, note]) =>
-      `<div class="lg-row"><svg viewBox="0 0 18 18" width="17" height="17">${icon}</svg>` +
+      `<div class="lg-row"><svg viewBox="0 0 18 18" width="17" height="17">${paint(icon)}</svg>` +
       `<b>${name}</b><span>${note}</span></div>`).join("");
   }
 
@@ -961,7 +990,7 @@
     svg.setAttribute("width", W); svg.setAttribute("height", H);
 
     // paper + dot grid + border
-    mk("rect", { width: W, height: H, fill: "#FAF8F2" }, svg);
+    mk("rect", { width: W, height: H, fill: theme().paper }, svg);
     const defs = mk("defs", {}, svg);
     const pat = mk("pattern", { id: "snapdots", width: 26, height: 26, patternUnits: "userSpaceOnUse" }, defs);
     mk("circle", { cx: 13, cy: 13, r: 1, fill: "#DCD8CC" }, pat);
@@ -1225,6 +1254,38 @@
     $("#modal").classList.remove("hidden");
   }
 
+  const THEME_HINTS = {
+    colour: "Green fairways, blue water, sandy bunkers.",
+    ink: "Pencil-and-paper greys, like the original notebook."
+  };
+  const PDF_HINTS = {
+    colour: "Prints in colour. Switch to Ink for a black-and-white pack that is kinder to printers.",
+    ink: "Prints in black and white \u2014 easy on ink, and it looks like the real notebook."
+  };
+  const THEME_LABEL = { colour: "Ink", ink: "Colour" };   // button offers the OTHER one
+
+  /**
+   * Switch palette everywhere at once: menu picker, hints, the in-game button,
+   * and (if a round is live) the board, legend and trails. Every fill is a plain
+   * SVG attribute, so a re-render is all that's needed and saved PNGs inherit
+   * the colours too.
+   */
+  function applyTheme(t) {
+    S.theme = (t === "colour" || t === "ink") ? t : "colour";
+    const pick = $("#theme-picker");
+    if (pick) [...pick.children].forEach(c => c.classList.toggle("on", c.dataset.t === S.theme));
+    const th = $("#theme-hint"), ph = $("#pdf-theme-hint");
+    if (th) th.textContent = THEME_HINTS[S.theme];
+    if (ph) ph.textContent = PDF_HINTS[S.theme];
+    const btn = $("#theme-btn");
+    if (btn) btn.textContent = THEME_LABEL[S.theme];
+    try { localStorage.setItem("mehgolf.theme", S.theme); } catch (e) { /* private mode */ }
+    if (S.course && !$("#game").classList.contains("hidden")) {
+      renderBoard();
+      renderLegend();
+    }
+  }
+
   /* ---------------- menu / boot ---------------- */
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
@@ -1233,6 +1294,8 @@
     // interpolate into HTML, the PDF byte stream, and a download filename.
     const raw = $("#seed-input").value.replace(/[^0-9]/g, "").slice(0, 10);
     S.seed = raw || RNG.randSeedCode();
+    const tsel = document.querySelector("#theme-picker .on");
+    if (tsel) S.theme = tsel.dataset.t;   // picker is kept in sync by applyTheme
     $("#seed-input").value = S.seed;
     S.size = S.players === 1 ? "pocket" : "xl";
   }
@@ -1296,7 +1359,7 @@
       readMenu();
       const course = genCourse(S.seed, S.size);
       const [ps, pc] = $("#pdf-range").value.split(":").map(Number);
-      PDF.downloadCoursePDF(course, ps, pc);
+      PDF.downloadCoursePDF(course, ps, pc, S.theme === "colour");
       SFX.page();
     });
 
@@ -1313,10 +1376,26 @@
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
     $("#save-btn").addEventListener("click", downloadBoardImage);
+
+    $("#theme-picker").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      [...$("#theme-picker").children].forEach(c => c.classList.toggle("on", c === b));
+      applyTheme(b.dataset.t);
+    });
+
+    // Same switch, reachable mid-round without going back to the menu.
+    $("#theme-btn").addEventListener("click", () => {
+      applyTheme(S.theme === "colour" ? "ink" : "colour");
+      SFX.page();
+    });
+    let saved = null;
+    try { saved = localStorage.getItem("mehgolf.theme"); } catch (e) { /* private mode */ }
+    applyTheme(saved || S.theme);
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });
     $("#pdf-btn2").addEventListener("click", () => {
-      PDF.downloadCoursePDF(S.course, 0, 18);
+      PDF.downloadCoursePDF(S.course, 0, 18, S.theme === "colour");
       SFX.page();
     });
     document.addEventListener("keydown", e => {

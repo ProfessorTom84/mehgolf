@@ -320,7 +320,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   transform-origin:center;
 }
 @media (prefers-reduced-motion: reduce){
-  .tree-sway, .water-shimmer, .mg-bird, .mg-wing, .mg-gust, .mg-leaf{animation:none !important}
+  .tree-sway, .water-shimmer, .mg-gust{animation:none !important}
   #ambience{display:none}
 }
 

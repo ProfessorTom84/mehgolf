@@ -16,6 +16,8 @@
       ops,
       fillG(g) { ops.push(n(g) + " g"); },
       strokeG(g) { ops.push(n(g) + " G"); },
+      fillRGB(r, gg, b) { ops.push(`${n(r)} ${n(gg)} ${n(b)} rg`); },
+      strokeRGB(r, gg, b) { ops.push(`${n(r)} ${n(gg)} ${n(b)} RG`); },
       lw(w) { ops.push(n(w) + " w"); },
       rect(x, y, w, h, mode) { ops.push(`${n(x)} ${n(Y(y) - h)} ${n(w)} ${n(h)} re ${mode || "f"}`); },
       line(x1, y1, x2, y2) { ops.push(`${n(x1)} ${n(Y(y1))} m ${n(x2)} ${n(Y(y2))} l S`); },
@@ -53,17 +55,41 @@
     [[-0.8, -0.8], [0.9, -0.5], [-0.5, 0.9]]  // NW
   ];
 
-  function drawHoleMap(d, g, x0, y0, cs) {
+  /* Two print palettes. Greys keep the original notebook look and are cheap to
+   * print; the colour set matches the on-screen board. */
+  const INK = {
+    fair: [0.88], water: [0.58], sand: [0.93], sandHatch: [0.6],
+    tree: [0.15], trunk: [0.15], slope: [0.35],
+    fairDot: [0.62], roughDot: [0.72], waterDot: [1]
+  };
+  const COLOUR = {
+    fair: [0.81, 0.89, 0.68], water: [0.50, 0.71, 0.86],
+    sand: [0.96, 0.91, 0.70], sandHatch: [0.88, 0.78, 0.49],
+    tree: [0.18, 0.42, 0.23], trunk: [0.42, 0.31, 0.19],
+    slope: [0.54, 0.48, 0.71],
+    fairDot: [0.50, 0.63, 0.36], roughDot: [0.71, 0.75, 0.64], waterDot: [0.86, 0.93, 0.97]
+  };
+
+  function painter(d, colour) {
+    const P = colour ? COLOUR : INK;
+    return {
+      fill(key) { const v = P[key]; v.length === 1 ? d.fillG(v[0]) : d.fillRGB(v[0], v[1], v[2]); },
+      stroke(key) { const v = P[key]; v.length === 1 ? d.strokeG(v[0]) : d.strokeRGB(v[0], v[1], v[2]); }
+    };
+  }
+
+  function drawHoleMap(d, g, x0, y0, cs, colour) {
     const cx = (x, y) => [x0 + x * cs + cs / 2, y0 + y * cs + cs / 2];
+    const P = painter(d, colour);
 
     // terrain fills first
     for (let y = 0; y < g.rows; y++) for (let x = 0; x < g.cols; x++) {
       const c = cell(g, x, y), [px, py] = cx(x, y), h = cs / 2;
-      if (c.t === T.FAIR) { d.fillG(0.88); d.rect(px - h, py - h, cs, cs); }
-      else if (c.t === T.WATER) { d.fillG(0.58); d.rect(px - h, py - h, cs, cs); }
+      if (c.t === T.FAIR) { P.fill("fair"); d.rect(px - h, py - h, cs, cs); }
+      else if (c.t === T.WATER) { P.fill("water"); d.rect(px - h, py - h, cs, cs); }
       else if (c.t === T.SAND) {
-        d.fillG(0.93); d.rect(px - h, py - h, cs, cs);
-        d.strokeG(0.6); d.lw(0.4);
+        P.fill("sand"); d.rect(px - h, py - h, cs, cs);
+        P.stroke("sandHatch"); d.lw(0.4);
         d.line(px - h, py + h, px + h, py - h);
       }
     }
@@ -71,14 +97,18 @@
     for (let y = 0; y < g.rows; y++) for (let x = 0; x < g.cols; x++) {
       const c = cell(g, x, y), [px, py] = cx(x, y);
       if (c.t === T.TREE) {
-        d.fillG(0.15);
-        if (c.tree === 2) { d.circle(px, py - cs * 0.08, cs * 0.28); d.rect(px - cs * 0.06, py + cs * 0.18, cs * 0.12, cs * 0.16); }
-        else d.poly([[px, py - cs * 0.34], [px + cs * 0.3, py + cs * 0.3], [px - cs * 0.3, py + cs * 0.3]]);
-      } else if (c.t === T.WATER) { d.fillG(1); d.circle(px, py, cs * 0.09); }
+        if (c.tree === 2) {
+          P.fill("tree"); d.circle(px, py - cs * 0.08, cs * 0.28);
+          P.fill("trunk"); d.rect(px - cs * 0.06, py + cs * 0.18, cs * 0.12, cs * 0.16);
+        } else {
+          P.fill("tree");
+          d.poly([[px, py - cs * 0.34], [px + cs * 0.3, py + cs * 0.3], [px - cs * 0.3, py + cs * 0.3]]);
+        }
+      } else if (c.t === T.WATER) { P.fill("waterDot"); d.circle(px, py, cs * 0.09); }
       else if (c.slope >= 0) {
-        d.fillG(0.35);
+        P.fill("slope");
         d.poly(SLOPE_PTS[c.slope].map(p => [px + p[0] * cs * 0.3, py + p[1] * cs * 0.3]));
-      } else { d.fillG(c.t === T.FAIR ? 0.62 : 0.72); d.circle(px, py, cs * 0.07); }
+      } else { P.fill(c.t === T.FAIR ? "fairDot" : "roughDot"); d.circle(px, py, cs * 0.07); }
     }
     // tee & cup on top
     const [tx, ty] = cx(g.tee.x, g.tee.y);
@@ -107,7 +137,7 @@
    * Page 1 of every download: how to play, plus the map key. Written to be
    * followed by a kid with a pencil and one die, no screen required.
    */
-  function buildIntroPage(course) {
+  function buildIntroPage(course, colour) {
     const d = makeOps();
     const M = 44;
     const colW = (PW - M * 2 - 26) / 2;
@@ -179,18 +209,19 @@
       ["cup",   "Cup",      "Land on it, or stop one dot past, to sink the ball."],
       ["foot",  "Bigfoot",  "He hides in some courses. Finding him earns a mulligan."]
     ];
+    const KP = painter(d, colour);
     key.forEach(([kind, name, note]) => {
       const cx = R + sw / 2, cy = ry - 6;
-      if (kind === "fair")  { d.fillG(0.88); d.rect(R, ry - 18, sw, sw - 6); }
-      if (kind === "sand")  { d.fillG(0.93); d.rect(R, ry - 18, sw, sw - 6);
-                              d.strokeG(0.82); d.lw(1.2);
+      if (kind === "fair")  { KP.fill("fair"); d.rect(R, ry - 18, sw, sw - 6); }
+      if (kind === "sand")  { KP.fill("sand"); d.rect(R, ry - 18, sw, sw - 6);
+                              KP.stroke("sandHatch"); d.lw(1.2);
                               d.line(R + 2, ry - 4, R + sw - 2, ry - 16); }
-      if (kind === "water") { d.fillG(0.62); d.rect(R, ry - 18, sw, sw - 6); }
-      if (kind === "rough") { d.fillG(0.78); d.circle(cx, cy, 2); }
-      if (kind === "tree")  { d.fillG(0.2);
+      if (kind === "water") { KP.fill("water"); d.rect(R, ry - 18, sw, sw - 6); }
+      if (kind === "rough") { KP.fill("roughDot"); d.circle(cx, cy, 2); }
+      if (kind === "tree")  { KP.fill("tree");
                               d.poly([[cx - 7, cy + 7], [cx, cy - 8], [cx + 7, cy + 7]]);
-                              d.rect(cx - 1.2, cy + 10, 2.4, 3); }
-      if (kind === "slope") { d.fillG(0.42); d.poly([[cx, cy - 7], [cx + 5, cy + 5], [cx, cy + 2], [cx - 5, cy + 5]]); }
+                              KP.fill("trunk"); d.rect(cx - 1.2, cy + 10, 2.4, 3); }
+      if (kind === "slope") { KP.fill("slope"); d.poly([[cx, cy - 7], [cx + 5, cy + 5], [cx, cy + 2], [cx - 5, cy + 5]]); }
       if (kind === "tee")   { d.strokeG(0.05); d.lw(2); d.circle(cx, cy, 6, "S"); }
       if (kind === "cup")   { d.fillG(0.05); d.circle(cx, cy, 6); }
       if (kind === "foot")  { d.fillG(0.2); d.circle(cx - 3.5, cy + 2, 2.6); d.circle(cx + 3.5, cy - 1, 2.6); }
@@ -218,7 +249,7 @@
   }
 
   /** Draw one full page for a single hole. Returns the page's content stream. */
-  function buildHolePage(course, hIdx) {
+  function buildHolePage(course, hIdx, colour) {
     const d = makeOps();
     const M = 40;
     const g = course.holes[hIdx];
@@ -242,7 +273,7 @@
     const cs = Math.min(availW / g.cols, availH / g.rows);
     const x0 = M + (availW - cs * g.cols) / 2;
     const y0 = top + (availH - cs * g.rows) / 2;
-    drawHoleMap(d, g, x0, y0, cs);
+    drawHoleMap(d, g, x0, y0, cs, colour);
 
     if (course.bigfoot && course.bigfoot.hole === hIdx) {
       const bx = x0 + course.bigfoot.x * cs + cs / 2, by = y0 + course.bigfoot.y * cs + cs / 2;
@@ -262,12 +293,12 @@
    * @param {number} start first hole index
    * @param {number} count how many holes/pages (default 6)
    */
-  function downloadCoursePDF(course, start, count) {
+  function downloadCoursePDF(course, start, count, colour) {
     const holes = Math.max(1, Math.min(18 - start, count == null ? 6 : count));
     // Page 1 is always the instructions + map key, so a printed pack is
     // playable on its own without anyone needing to explain the rules.
-    const streams = [buildIntroPage(course)];
-    for (let i = 0; i < holes; i++) streams.push(buildHolePage(course, start + i));
+    const streams = [buildIntroPage(course, colour)];
+    for (let i = 0; i < holes; i++) streams.push(buildHolePage(course, start + i, colour));
     const n = streams.length;
 
     // object ids: 1 catalog, 2 pages, then n page objects, then n content
