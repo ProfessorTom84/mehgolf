@@ -64,7 +64,7 @@
     }
 
     if (holeAt === cells.length - 1) return { ok: true, cells, land: cells[cells.length - 1], holed: true };
-    if (holeAt === cells.length - 2) // crossed the cup, stopped one past: counts
+    if (holeAt >= 0 && holeAt === cells.length - 2) // crossed the cup, stopped one past: counts
       return { ok: true, cells, land: hole, holed: true, overshoot: true };
     const land = cells[cells.length - 1];
     const lt = terrainAt(land);
@@ -174,8 +174,38 @@
     const wrap = $("#board-wrap");
     wrap.innerHTML = "";
     wrap.appendChild(svg);
+    svg.dataset.vw = w; svg.dataset.vh = h;
+    fitBoard();
     drawTrails(); drawBalls();
   }
+
+  // Size the board svg to whatever space is actually available, instead of
+  // just capping its width and letting a tall grid overflow the viewport.
+  function fitBoard() {
+    const svg = document.getElementById("board");
+    if (!svg) return;
+    const vw = Number(svg.dataset.vw), vh = Number(svg.dataset.vh);
+    if (!vw || !vh) return;
+
+    const isNarrow = window.innerWidth <= 900;
+    const maxW = Math.min(window.innerWidth * (isNarrow ? 0.92 : 0.62), 560);
+
+    // Vertical budget: from the board's top down to the bottom of the viewport,
+    // minus the page footer strip below it and a little breathing room.
+    const top = $("#board-wrap").getBoundingClientRect().top;
+    const foot = document.querySelector(".page-foot");
+    const footH = foot ? foot.getBoundingClientRect().height : 0;
+    const maxH = Math.max(220, window.innerHeight - top - footH - 28);
+
+    const scale = Math.min(maxW / vw, maxH / vh);
+    svg.style.width = (vw * scale) + "px";
+    svg.style.height = (vh * scale) + "px";
+  }
+  let fitTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitBoard, 100);
+  });
 
   const jitter = () => (S.wobble() - 0.5) * 3.5;
 
@@ -464,6 +494,72 @@
     [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
   }
 
+  /* ---------------- board snapshot download ---------------- */
+  function boardSnapshotSVG() {
+    const live = document.getElementById("board");
+    if (!live) return null;
+    const vw = Number(live.dataset.vw), vh = Number(live.dataset.vh);
+    const ns = "http://www.w3.org/2000/svg";
+    const clone = live.cloneNode(true);
+    clone.removeAttribute("id"); clone.removeAttribute("style"); clone.removeAttribute("aria-label");
+    ["aim", "preview"].forEach(id => { const n = clone.querySelector("#" + id); if (n) n.remove(); }); // UI-only layers
+    clone.setAttribute("x", 0); clone.setAttribute("y", 44);
+    clone.setAttribute("width", vw); clone.setAttribute("height", vh);
+    clone.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+
+    const headerH = 44, footerH = 26, W = vw, H = headerH + vh + footerH;
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("xmlns", ns);
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("width", W); svg.setAttribute("height", H);
+
+    const text = (x, y, size, weight, fill, str) => {
+      const t = document.createElementNS(ns, "text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("font-family", "Courier New, monospace");
+      t.setAttribute("font-size", size); t.setAttribute("font-weight", weight); t.setAttribute("fill", fill);
+      t.textContent = str;
+      return t;
+    };
+    const bg = document.createElementNS(ns, "rect");
+    bg.setAttribute("width", W); bg.setAttribute("height", H); bg.setAttribute("fill", "#FAF8F2");
+    svg.appendChild(bg);
+    svg.appendChild(text(10, 19, 14, 700, "#24262B", `${S.course.name.toUpperCase()} \u2014 HOLE ${S.holeIdx + 1}/18`));
+    svg.appendChild(text(10, 36, 11, 400, "#6a6d64", `SEED ${S.seed}`));
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("x1", 0); line.setAttribute("y1", headerH - 6); line.setAttribute("x2", W); line.setAttribute("y2", headerH - 6);
+    line.setAttribute("stroke", "#24262B"); line.setAttribute("stroke-width", 2);
+    svg.appendChild(line);
+    svg.appendChild(clone);
+    svg.appendChild(text(10, headerH + vh + 18, 10, 400, "#6a6d64", "MEH GOLF \u2014 enter this seed to play the same course"));
+    return svg;
+  }
+
+  function downloadBoardImage() {
+    const svg = boardSnapshotSVG();
+    if (!svg) return;
+    const W = Number(svg.getAttribute("width")), H = Number(svg.getAttribute("height"));
+    const xml = new XMLSerializer().serializeToString(svg);
+    const svg64 = btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = W * scale; canvas.height = H * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#FAF8F2"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `meh-golf-${S.seed}-hole-${S.holeIdx + 1}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, "image/png");
+    };
+    img.src = "data:image/svg+xml;base64," + svg64;
+  }
+
   /* ---------------- hole / course flow ---------------- */
   function holeComplete() {
     S.phase = "between";
@@ -473,7 +569,8 @@
       `<p><span style="color:${p.color}">\u25CF</span> ${p.name}: <b>${p.scores[S.holeIdx]}</b> &nbsp; total ${total(p)}</p>`).join("");
     banner(`<h2>Hole ${S.holeIdx + 1} complete</h2>${rows}`,
       last ? "See final scorecard" : "Next hole \u2192",
-      () => { last ? courseComplete() : nextHole(); });
+      () => { last ? courseComplete() : nextHole(); },
+      true);
   }
 
   function nextHole() {
@@ -491,7 +588,7 @@
     const list = ranked.map((p, i) =>
       `<p>${i === 0 ? "\u{1F3C6}" : (i + 1) + "."} <span style="color:${p.color}">\u25CF</span> ${p.name} \u2014 <b>${total(p)}</b> (${fmtToPar(total(p))})</p>`).join("");
     banner(`<h2>Course complete</h2><p><i>${S.course.name}</i> \u00B7 seed ${S.seed}</p>${list}`,
-      "Back to the clubhouse", () => { hideBanner(); showMenu(); });
+      "Back to the clubhouse", () => { hideBanner(); showMenu(); }, true);
     openScorecard();
   }
 
@@ -549,12 +646,14 @@
 
   /* ---------------- overlays ---------------- */
   function msg(t) { $("#msg").textContent = t; }
-  function banner(html, btnLabel, fn) {
+  function banner(html, btnLabel, fn, showSave) {
     const b = $("#banner");
     b.classList.remove("hidden");
     b.innerHTML = `<div class="banner-card">${html}</div>`;
+    const card = b.querySelector(".banner-card");
+    if (showSave) card.appendChild(btn("Save board image", "ghost small", downloadBoardImage));
     const button = btn(btnLabel, "primary", fn);
-    b.querySelector(".banner-card").appendChild(button);
+    card.appendChild(button);
     button.focus();
   }
   function hideBanner() { $("#banner").classList.add("hidden"); }
@@ -577,12 +676,34 @@
     $("#modal").classList.remove("hidden");
   }
 
+  function openLegend() {
+    const body = $("#modal-body");
+    const sw = (inner) => `<svg viewBox="0 0 34 34" width="30" height="30">${inner}</svg>`;
+    const rows = [
+      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#E4E2DA"/>`), "Fairway", "+1 to your next roll's distance."],
+      [sw(`<circle cx="17" cy="17" r="2" fill="#C6C2B8"/>`), "Rough", "Plain ground — no bonus or penalty."],
+      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#F0E8D2"/><line x1="4" y1="30" x2="30" y2="4" stroke="#D9CBA4" stroke-width="2"/>`), "Sand", "\u22121 to your next roll's distance."],
+      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#969C9F"/>`), "Water", "May fly over it, never land in it."],
+      [sw(`<polygon points="17,6 26,24 8,24" fill="#3A3F3A"/><rect x="15.4" y="24" width="3.2" height="4" fill="#3A3F3A"/>`), "Trees", "Block the shot \u2014 unless struck from the fairway (or a driver), which flies over."],
+      [sw(`<g transform="translate(17,17) rotate(45)"><polygon points="0,-8 7,6 0,2.5 -7,6" fill="#6B6F66"/></g>`), "Slope", "Rolls the ball one extra dot in the arrow's direction, chaining into any slope it lands on."],
+      [sw(`<circle cx="17" cy="17" r="7.5" fill="#FAF8F2" stroke="#24262B" stroke-width="3"/>`), "Tee", "Where every hole starts."],
+      [sw(`<circle cx="17" cy="17" r="8" fill="#24262B"/><circle cx="19.5" cy="14.5" r="1.8" fill="#FAF8F2" opacity=".5"/>`), "Cup", "Land exactly on it, or cross it and stop one dot past, to sink your ball."],
+      [sw(`<g opacity=".7"><ellipse cx="13.5" cy="18" rx="3.2" ry="5" fill="#3A3F3A" transform="rotate(-12 13.5 18)"/><ellipse cx="20.5" cy="15" rx="3.2" ry="5" fill="#3A3F3A" transform="rotate(12 20.5 15)"/></g>`), "Bigfoot", "Hidden on some courses. Click him for a bonus mulligan."],
+    ];
+    let html = `<div class="legend-grid">` + rows.map(([icon, name, desc]) =>
+      `<div class="legend-row"><div class="legend-icon">${icon}</div><div><b>${name}</b><p>${desc}</p></div></div>`
+    ).join("") + `</div>`;
+    html += `<p class="hint" style="margin-top:.6rem">Player colors are shown on the ball and in the footer beneath the board.</p>`;
+    body.innerHTML = html;
+    $("#modal").classList.remove("hidden");
+  }
+
   /* ---------------- menu / boot ---------------- */
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
     // a raw PDF byte stream, and a download filename.
     const raw = $("#seed-input").value.trim().toUpperCase().replace(/[^A-Z0-9 _\-]/g, "");
-    S.seed = raw || RNG.randSeedWord();
+    S.seed = raw || RNG.randSeedCode();
     $("#seed-input").value = S.seed;
     S.size = S.players === 1 ? "pocket" : "xl";
   }
@@ -614,9 +735,9 @@
   }
 
   function wireMenu() {
-    $("#seed-input").value = RNG.randSeedWord();
+    $("#seed-input").value = RNG.randSeedCode();
     $("#shuffle-seed").addEventListener("click", () => {
-      $("#seed-input").value = RNG.randSeedWord();
+      $("#seed-input").value = RNG.randSeedCode();
       SFX.diceTick();
     });
     $("#player-picker").addEventListener("click", e => {
@@ -655,6 +776,8 @@
     $("#exit-btn").addEventListener("click", () => {
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
+    $("#legend-btn").addEventListener("click", openLegend);
+    $("#save-btn").addEventListener("click", downloadBoardImage);
     $("#score-btn").addEventListener("click", openScorecard);
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });

@@ -30,14 +30,16 @@
     return mulberry32(h());
   }
 
-  function randSeedWord() {
-    const A = ["BIRDIE","BOGEY","EAGLE","DIVOT","CADDY","WEDGE","MULLIGAN","FRINGE","DOGLEG","SHANK","ALBATROSS","TEEBOX"];
-    const r = Math.random;
-    return A[(r() * A.length) | 0] + "-" + (100 + ((r() * 900) | 0));
+  function randSeedCode() {
+    // Purely numeric so it's easy to read aloud, type on a phone, or write in
+    // a notebook margin: an 8-digit code, e.g. "40217593".
+    let s = "";
+    for (let i = 0; i < 8; i++) s += (Math.random() * 10) | 0;
+    return s;
   }
 
   const pick = (rng, arr) => arr[(rng() * arr.length) | 0];
   const ri = (rng, min, max) => min + ((rng() * (max - min + 1)) | 0); // inclusive int
 
-  global.RNG = { rngFor, randSeedWord, pick, ri };
+  global.RNG = { rngFor, randSeedCode, pick, ri };
 })(window);
