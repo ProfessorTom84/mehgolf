@@ -15,13 +15,14 @@ No build step, no npm, no CDN calls. You can also just open `index.html` directl
 ## Features
 
 - **Shot history** — a running log beside the board records every shot: the die face, the terrain modifier, distance, direction, and where the ball ended up. In multiplayer each line is tagged with the player's name and color.
-- **Legend** — an in-game panel explaining every symbol on the map.
+- **Legend & scorecard** — always visible beside the board, no pop-ups: the map key sits under the shot history, the live scorecard under the turn card.
+- **Breeze** — trees sway and water shimmers, each on its own seeded phase (disabled under `prefers-reduced-motion`).
 - **Seeded courses** — the numeric seed code deterministically generates all 18 holes (terrain, slopes, even where the bigfoot hides). Share a seed to play identical courses on different machines.
 - **Two rule sets** — Dice golf (roll a d6; fairway +1, sand −1) and Speed golf (driver 6 / iron 3 / putter 1).
 - **Local multiplayer** — 1–4 players, pass-and-play. Solo uses the pocket 14×20 grid; 2+ players get the XL 18×26 grid. After tee-off, the player furthest from the cup always shoots next.
 - **Physical dice** — a CSS-3D die tumbles and bounces across the notebook page with clatter sounds, then settles on the result.
 - **Terrain rules** — fairway, rough, sand, water, trees (pines and broadleafs), chained slope arrows, exact-landing or overshoot-by-one sinking, tee re-rolls, and 6 mulligans per player per course.
-- **Print & play PDF** — downloads a hand-built vector PDF (US Letter), **one hole per page** so each map is full size. No PDF library; the file is emitted byte-by-byte.
+- **Print & play PDF** — downloads a hand-built vector PDF (US Letter), **one hole per page** so each map is full size, and page 1 is always an illustrated how-to-play plus map key so a printed pack is playable on its own. No PDF library; the file is emitted byte-by-byte.
 - **All-synthesized audio** — every sound effect is generated with the Web Audio API at runtime; there are no asset files anywhere in the project.
 
 ## Project layout

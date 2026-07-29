@@ -88,6 +88,135 @@
     d.fillG(0.05); d.circle(hx2, hy2, cs * 0.34);
   }
 
+  /** Word-wrap a string to a pixel width at a Courier size (0.6 em per char). */
+  function wrap(str, size, width) {
+    const per = Math.floor(width / (size * 0.6));
+    const words = str.split(" ");
+    const lines = [];
+    let line = "";
+    for (const w of words) {
+      if (!line.length) line = w;
+      else if ((line + " " + w).length <= per) line += " " + w;
+      else { lines.push(line); line = w; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  /**
+   * Page 1 of every download: how to play, plus the map key. Written to be
+   * followed by a kid with a pencil and one die, no screen required.
+   */
+  function buildIntroPage(course) {
+    const d = makeOps();
+    const M = 44;
+    const colW = (PW - M * 2 - 26) / 2;
+    const L = M, R = M + colW + 26;
+
+    // friendly masthead
+    d.fillG(0.94); d.rect(M - 14, 30, PW - (M - 14) * 2, 74);
+    d.fillG(0.05);
+    d.text(M, 62, 30, "MEH GOLF", true);
+    d.text(M, 84, 12, "Eighteen holes of pencil-and-paper golf. All you need is a die.");
+    d.strokeG(0.05); d.lw(2); d.line(M - 14, 104, PW - M + 14, 104);
+
+    d.text(M, 124, 11, "Course: " + course.name + "        Course code: " + course.seed, true);
+    d.fillG(0.35);
+    d.text(M, 138, 9, "Type that code into the game to play these exact holes on screen.");
+
+    /* ---------------- left column: how to play ---------------- */
+    let y = 168;
+    d.fillG(0.05);
+    d.text(L, y, 15, "HOW TO PLAY", true); y += 8;
+    d.strokeG(0.05); d.lw(1.2); d.line(L, y, L + colW, y); y += 18;
+
+    const steps = [
+      ["1. Start at the tee.", "The little circle is where your ball begins. The solid dot is the cup. Get from one to the other in as few shots as you can."],
+      ["2. Roll the die.", "The number you roll is how many dots your ball travels. Roll a 4, move 4 dots."],
+      ["3. Pick a direction.", "Straight up, down, left, right, or any diagonal - eight choices. The ball travels in a straight line and stops."],
+      ["4. Mark it down.", "Draw a line from where the ball was to where it landed. Add one stroke to your score."],
+      ["5. Sink it.", "Land exactly on the cup and you are in. If your line goes over the cup and stops just one dot past, that counts too!"]
+    ];
+    steps.forEach(([head, body]) => {
+      d.fillG(0.05);
+      d.text(L, y, 11, head, true); y += 13;
+      d.fillG(0.25);
+      wrap(body, 9.5, colW).forEach(ln => { d.text(L + 8, y, 9.5, ln); y += 11.5; });
+      y += 7;
+    });
+
+    y += 4;
+    d.fillG(0.05);
+    d.text(L, y, 12, "THE THREE RULES THAT MATTER", true); y += 8;
+    d.strokeG(0.05); d.line(L, y, L + colW, y); y += 16;
+    const rules = [
+      "Fairway is friendly. Hit from the light grey area and your ball goes 1 dot FURTHER, and it flies right over trees.",
+      "Sand is grumpy. Hit from a striped patch and your ball goes 1 dot SHORTER.",
+      "You get do-overs. Your first shot on each hole can be re-rolled once for free. You also get 6 mulligans for the whole round - use one any time you hate your roll."
+    ];
+    rules.forEach(r => {
+      d.fillG(0.05); d.circle(L + 3, y - 3, 2);
+      d.fillG(0.25);
+      wrap(r, 9.5, colW - 12).forEach((ln, i) => { d.text(L + 12, y, 9.5, ln); y += 11.5; });
+      y += 5;
+    });
+
+    /* ---------------- right column: map key ---------------- */
+    let ry = 168;
+    d.fillG(0.05);
+    d.text(R, ry, 15, "MAP KEY", true); ry += 8;
+    d.strokeG(0.05); d.line(R, ry, R + colW, ry); ry += 20;
+
+    const sw = 26;                                    // icon swatch size
+    const key = [
+      ["fair",  "Fairway",  "Hit from here: go 1 dot further, and fly over trees."],
+      ["rough", "Rough",    "Plain ground. No help, no harm."],
+      ["sand",  "Sand",     "Hit from here: go 1 dot shorter."],
+      ["water", "Water",    "You may fly over it. You may never land in it."],
+      ["tree",  "Trees",    "Blocked - unless you are hitting from the fairway."],
+      ["slope", "Slope",    "Land here and roll 1 more dot the way the arrow points."],
+      ["tee",   "Tee",      "Where the hole starts."],
+      ["cup",   "Cup",      "Land on it, or stop one dot past, to sink the ball."],
+      ["foot",  "Bigfoot",  "He hides in some courses. Finding him earns a mulligan."]
+    ];
+    key.forEach(([kind, name, note]) => {
+      const cx = R + sw / 2, cy = ry - 6;
+      if (kind === "fair")  { d.fillG(0.88); d.rect(R, ry - 18, sw, sw - 6); }
+      if (kind === "sand")  { d.fillG(0.93); d.rect(R, ry - 18, sw, sw - 6);
+                              d.strokeG(0.82); d.lw(1.2);
+                              d.line(R + 2, ry - 4, R + sw - 2, ry - 16); }
+      if (kind === "water") { d.fillG(0.62); d.rect(R, ry - 18, sw, sw - 6); }
+      if (kind === "rough") { d.fillG(0.78); d.circle(cx, cy, 2); }
+      if (kind === "tree")  { d.fillG(0.2);
+                              d.poly([[cx - 7, cy + 7], [cx, cy - 8], [cx + 7, cy + 7]]);
+                              d.rect(cx - 1.2, cy + 10, 2.4, 3); }
+      if (kind === "slope") { d.fillG(0.42); d.poly([[cx, cy - 7], [cx + 5, cy + 5], [cx, cy + 2], [cx - 5, cy + 5]]); }
+      if (kind === "tee")   { d.strokeG(0.05); d.lw(2); d.circle(cx, cy, 6, "S"); }
+      if (kind === "cup")   { d.fillG(0.05); d.circle(cx, cy, 6); }
+      if (kind === "foot")  { d.fillG(0.2); d.circle(cx - 3.5, cy + 2, 2.6); d.circle(cx + 3.5, cy - 1, 2.6); }
+      d.fillG(0.05);
+      d.text(R + sw + 10, ry - 8, 10.5, name, true);
+      d.fillG(0.3);
+      const lines = wrap(note, 8.8, colW - sw - 12);
+      lines.forEach((ln, i) => d.text(R + sw + 10, ry + 3 + i * 10, 8.8, ln));
+      ry += Math.max(sw + 4, 16 + lines.length * 10);
+    });
+
+    // a warm sign-off box
+    ry += 6;
+    d.strokeG(0.55); d.lw(1.2);
+    d.rect(R, ry - 10, colW, 62, "S");
+    d.fillG(0.05);
+    d.text(R + 10, ry + 8, 10.5, "PLAYING WITH FRIENDS?", true);
+    d.fillG(0.28);
+    wrap("Everyone tees off in turn. After that, whoever is furthest from the cup shoots next. Lowest total after 18 holes wins.", 8.8, colW - 20)
+      .forEach((ln, i) => d.text(R + 10, ry + 22 + i * 10, 8.8, ln));
+
+    d.fillG(0.4);
+    d.text(M, PH - 34, 9, "Par is 6 on every hole. Have fun, and don't take the sand personally.");
+    return d.ops.join("\n");
+  }
+
   /** Draw one full page for a single hole. Returns the page's content stream. */
   function buildHolePage(course, hIdx) {
     const d = makeOps();
@@ -134,9 +263,12 @@
    * @param {number} count how many holes/pages (default 6)
    */
   function downloadCoursePDF(course, start, count) {
-    const n = Math.max(1, Math.min(18 - start, count == null ? 6 : count));
-    const streams = [];
-    for (let i = 0; i < n; i++) streams.push(buildHolePage(course, start + i));
+    const holes = Math.max(1, Math.min(18 - start, count == null ? 6 : count));
+    // Page 1 is always the instructions + map key, so a printed pack is
+    // playable on its own without anyone needing to explain the rules.
+    const streams = [buildIntroPage(course)];
+    for (let i = 0; i < holes; i++) streams.push(buildHolePage(course, start + i));
+    const n = streams.length;
 
     // object ids: 1 catalog, 2 pages, then n page objects, then n content
     // objects, then the two fonts.
@@ -172,9 +304,9 @@
     const blob = new Blob([pdf], { type: "application/pdf" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = n === 1
+    a.download = holes === 1
       ? `meh-golf-${course.seed}-hole-${start + 1}.pdf`
-      : `meh-golf-${course.seed}-holes-${start + 1}-${start + n}.pdf`;
+      : `meh-golf-${course.seed}-holes-${start + 1}-${start + holes}.pdf`;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }

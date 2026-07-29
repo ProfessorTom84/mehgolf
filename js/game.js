@@ -19,7 +19,8 @@
     rolled: 0, moveN: 0, moveKind: "roll", // roll|putt|driver|iron
     bigfootFound: false,
     wobble: null,              // seeded rng for hand-drawn jitter
-    log: []                    // shot history
+    log: [],                   // shot history
+    caddieKey: "", caddieText: ""
   };
 
   /* ---------------- helpers ---------------- */
@@ -134,19 +135,33 @@
 
       // grid dots / features
       if (c.t === T.TREE) {
+        // Each tree is its own group so it can sway from the base. The phase is
+        // seeded off the cell, so a given course always breathes the same way
+        // and neighbouring trees never move in lockstep.
+        const swayR = RNG.rngFor(S.seed + "|breeze|" + S.holeIdx + "|" + x + "," + y);
+        const g0 = el("g", {
+          class: "tree-sway",
+          style: `transform-origin:${px(x)}px ${px(y) + 9}px; ` +
+                 `animation-delay:${(-swayR() * 6).toFixed(2)}s; ` +
+                 `animation-duration:${(4.4 + swayR() * 2.6).toFixed(2)}s`
+        }, feat);
         if (c.tree === 2) { // round tree
-          el("circle", { cx: px(x), cy: px(y) - 3, r: 8.5, fill: "#3A3F3A" }, feat);
-          el("rect", { x: px(x) - 1.8, y: px(y) + 4, width: 3.6, height: 6, fill: "#3A3F3A" }, feat);
+          el("circle", { cx: px(x), cy: px(y) - 3, r: 8.5, fill: "#3A3F3A" }, g0);
+          el("rect", { x: px(x) - 1.8, y: px(y) + 4, width: 3.6, height: 6, fill: "#3A3F3A" }, g0);
         } else { // pine
-          el("polygon", { points: `${px(x)},${px(y) - 11} ${px(x) + 9},${px(y) + 7} ${px(x) - 9},${px(y) + 7}`, fill: "#3A3F3A" }, feat);
-          el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: "#3A3F3A" }, feat);
+          el("polygon", { points: `${px(x)},${px(y) - 11} ${px(x) + 9},${px(y) + 7} ${px(x) - 9},${px(y) + 7}`, fill: "#3A3F3A" }, g0);
+          el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: "#3A3F3A" }, g0);
         }
       } else if (c.slope >= 0) {
         const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .85 }, feat);
         el("polygon", { points: "0,-8 7,6 0,2.5 -7,6", fill: "#6B6F66" }, a);
       } else {
         const col = c.t === T.WATER ? "#EDEFEF" : c.t === T.FAIR ? "#A8A59A" : c.t === T.SAND ? "#CBBD97" : "#C6C2B8";
-        el("circle", { cx: px(x), cy: px(y), r: 2, fill: col }, dots);
+        const dot = el("circle", { cx: px(x), cy: px(y), r: 2, fill: col }, dots);
+        if (c.t === T.WATER) {
+          dot.setAttribute("class", "water-shimmer");
+          dot.setAttribute("style", `animation-delay:${(-((x * 7 + y * 3) % 40) / 10).toFixed(1)}s`);
+        }
       }
     }
 
@@ -205,8 +220,8 @@
       maxW = Math.min(window.innerWidth * 0.92, 560);
     } else {
       const felt = document.querySelector(".table-felt");
-      const hist = document.querySelector(".history");
-      const tray = document.querySelector(".tray");
+      const hist = document.querySelector(".side-left");
+      const tray = document.querySelector(".side-right");
       const feltW = felt ? felt.clientWidth : window.innerWidth;
       const sideW = (hist ? hist.getBoundingClientRect().width : 0)
         + (tray ? tray.getBoundingClientRect().width : 0);
@@ -409,6 +424,7 @@
   function endOfShot(justHoled) {
     drawTrails(); drawBalls();   // repaint so the numbered shot markers appear
     updateFoot();
+    renderScorecard();
     if (S.ps.every(p => p.holed)) return holeComplete();
     nextPlayer();
     startTurn(justHoled);
@@ -549,6 +565,60 @@
     [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
   }
 
+  /* ---------------- inline legend ---------------- */
+  const LEGEND_ROWS = [
+    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#E4E2DA"/>`, "Fairway", "+1 dot, flies trees"],
+    [`<circle cx="9" cy="9" r="2" fill="#C6C2B8"/>`, "Rough", "no bonus"],
+    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#F0E8D2"/><line x1="3" y1="15" x2="15" y2="3" stroke="#D9CBA4" stroke-width="2"/>`, "Sand", "\u22121 dot"],
+    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#969C9F"/>`, "Water", "fly over, never land"],
+    [`<polygon points="6,3 11,13 1,13" fill="#3A3F3A"/><circle cx="14" cy="7" r="4" fill="#3A3F3A"/>`, "Trees", "block unless from fairway"],
+    [`<g transform="translate(9,9) rotate(45)"><polygon points="0,-5 4,4 0,1.5 -4,4" fill="#6B6F66"/></g>`, "Slope", "rolls ball 1 more"],
+    [`<circle cx="9" cy="9" r="5" fill="#FAF8F2" stroke="#24262B" stroke-width="2.4"/>`, "Tee", "start of the hole"],
+    [`<circle cx="9" cy="9" r="5.5" fill="#24262B"/>`, "Cup", "land on it, or 1 past"],
+    [`<g opacity=".75"><ellipse cx="6" cy="10" rx="2.2" ry="3.4" fill="#3A3F3A"/><ellipse cx="12" cy="8" rx="2.2" ry="3.4" fill="#3A3F3A"/></g>`, "Bigfoot", "click for a mulligan"]
+  ];
+
+  function renderLegend() {
+    const box = $("#legend-inline");
+    if (!box) return;
+    box.innerHTML = LEGEND_ROWS.map(([icon, name, note]) =>
+      `<div class="lg-row"><svg viewBox="0 0 18 18" width="17" height="17">${icon}</svg>` +
+      `<b>${name}</b><span>${note}</span></div>`).join("");
+  }
+
+  /* ---------------- live scorecard ---------------- */
+  function renderScorecard() {
+    const box = $("#scorecard-inline");
+    if (!box) return;
+    const ps = S.ps;
+    let html = `<table class="sc-table"><thead><tr><th>Hole</th>` +
+      ps.map(p => `<th style="color:${p.color}">${p.name.slice(0, 4)}</th>`).join("") +
+      `</tr></thead><tbody>`;
+    for (let h = 0; h < 18; h++) {
+      const now = h === S.holeIdx ? " class=\"now\"" : "";
+      html += `<tr${now}><td>${h + 1}</td>` + ps.map(p => {
+        const v = p.scores[h];
+        if (v == null) return `<td>${h === S.holeIdx && !p.holed ? p.strokes || "\u00B7" : "\u00B7"}</td>`;
+        const cls = v < 6 ? "sc-under" : v > 6 ? "sc-over" : "";
+        return `<td class="${cls}">${v}</td>`;
+      }).join("") + `</tr>`;
+    }
+    const par = (S.holeIdx + (S.ps.some(p => p.holed) ? 1 : 0)) * 6;
+    html += `<tr class="tot"><td>Total</td>` + ps.map(p => {
+      const t = total(p);
+      const rel = t - par;
+      const tag = par > 0 ? ` <span class="${rel < 0 ? "sc-under" : rel > 0 ? "sc-over" : ""}">${rel > 0 ? "+" + rel : rel || "E"}</span>` : "";
+      return `<td>${t}${tag}</td>`;
+    }).join("") + `</tr></tbody></table>`;
+    box.innerHTML = html;
+    // keep the hole being played in view
+    const cur = box.querySelector("tr.now");
+    if (cur && box.scrollHeight > box.clientHeight) {
+      const t = cur.offsetTop - box.clientHeight / 2;
+      box.scrollTop = Math.max(0, t);
+    }
+  }
+
   /* ---------------- hover inspector ---------------- */
   const TERRAIN_INFO = {
     [T.ROUGH]: ["Rough", "Plain ground. No bonus, no penalty."],
@@ -601,73 +671,57 @@
   }
 
   /* ---------------- caddie chatter ---------------- */
-  const CADDIE = {
-    tee: [
-      "New hole, clean scorecard. The notebook forgets everything.",
-      "Somewhere out there is a par. Go introduce yourself.",
-      "The tee box: the only place on this course where nothing has gone wrong yet.",
-      "Aim small, miss small. Or aim big and tell everyone you meant it.",
-      "Every great round starts with one unremarkable shot."
-    ],
-    fairway: [
-      "You're on the short grass. The die owes you a big one.",
-      "Fairway means the ball runs an extra dot — and sails clean over the pines.",
-      "This is the good stuff. Don't overthink it.",
-      "From here you can fly the trees. Use that while you have it."
-    ],
-    sand: [
-      "Sand costs you a dot. Consider it a tax on ambition.",
-      "The bunker: nature's way of asking if you were paying attention.",
-      "Play the escape, not the hero shot. Out is better than close.",
-      "Every golfer leaves a little something in the sand. Usually their scorecard."
-    ],
-    rough: [
-      "The rough is honest, at least. No bonus, no penalty, no sympathy.",
-      "Nothing helping you here, but nothing hurting you either.",
-      "Plain ground. The die decides everything from here.",
-      "A modest lie for a modest shot. There's no shame in modest."
-    ],
-    close: [
-      "You're a whisker away. Remember: one dot past still drops.",
-      "Short game time. This is where notebooks are won.",
-      "Close enough to smell it. Don't get greedy with the line.",
-      "A putt moves exactly 1. Sometimes that's the whole trick."
-    ],
-    trouble: [
-      "Awkward spot. Take your medicine and move on.",
-      "Getting out is a fine ambition right now.",
-      "The bold line is a trap. The boring line is a score.",
-      "Somewhere, a mulligan is quietly clearing its throat."
-    ],
-    deep: [
-      "This hole has become a character-building exercise.",
-      "Par is a memory. Let's aim for dignity.",
-      "Six strokes in and still writing. That's commitment.",
-      "The pencil is getting shorter. So is the patience."
-    ]
-  };
 
-  function caddieLine(p) {
-    const rng = RNG.rngFor(S.seed + "|caddie|" + S.holeIdx + "|" + S.cur + "|" + p.strokes);
-    let pool;
-    const t = terrainAt(p.pos);
-    const d = Math.max(Math.abs(p.pos.x - g().hole.x), Math.abs(p.pos.y - g().hole.y));
-    if (p.strokes >= 7) pool = CADDIE.deep;
-    else if (p.strokes === 0) pool = CADDIE.tee;
-    else if (d <= 2) pool = CADDIE.close;
-    else if (t === T.SAND) pool = CADDIE.sand;
-    else if (t === T.FAIR) pool = CADDIE.fairway;
-    else if (d >= 12) pool = CADDIE.trouble;
-    else pool = CADDIE.rough;
-    return RNG.pick(rng, pool);
+  function nearWater(pos) {
+    const G = g();
+    for (const d of DIRS) {
+      const x = pos.x + d.x, y = pos.y + d.y;
+      if (inB(G, x, y) && cell(G, x, y).t === T.WATER) return true;
+    }
+    return false;
+  }
+
+  /** Which pool of lines fits this player's situation right now. */
+  function caddieBucket(p) {
+    const G = g();
+    const dist = Math.max(Math.abs(p.pos.x - G.hole.x), Math.abs(p.pos.y - G.hole.y));
+    const lie = terrainAt(p.pos);
+
+    if (p.strokes === 0) {
+      if (S.holeIdx === 17) return "final";
+      // In a multiplayer round, comment on the standings at the tee.
+      if (S.ps.length > 1 && S.holeIdx > 0) {
+        const totals = S.ps.map(q => total(q));
+        const mine = total(p);
+        const best = Math.min(...totals), worst = Math.max(...totals);
+        if (mine === best && worst - mine >= 2) return "lead";
+        if (mine === worst && mine - best >= 2) return "behind";
+      }
+      return "tee";
+    }
+    if (p.strokes >= 7) return "deep";
+    if (dist <= 2) return "close";
+    if (lie === T.SAND) return "sand";
+    if (nearWater(p.pos)) return "water";
+    if (lie === T.FAIR) return "fairway";
+    if (dist >= 12) return "trouble";
+    return "rough";
   }
 
   function updateCaddie() {
     const box = $("#caddie");
     if (!box) return;
     if (S.phase === "over") { box.classList.add("hidden"); return; }
+    const p = P();
+    // One line per turn: the card re-renders several times per shot, and each
+    // render must not burn another line off the deck.
+    const key = `${S.holeIdx}|${S.cur}|${p.strokes}`;
+    if (key !== S.caddieKey) {
+      S.caddieKey = key;
+      S.caddieText = Caddie.take(caddieBucket(p));
+    }
     box.classList.remove("hidden");
-    box.innerHTML = `<span class="caddie-label">Caddie</span><p>${caddieLine(P())}</p>`;
+    box.innerHTML = `<span class="caddie-label">Caddie</span><p>${S.caddieText}</p>`;
   }
 
   /* ---------------- shot history ---------------- */
@@ -1000,6 +1054,7 @@
     $("#turn-player .nm").textContent = p.name;
     $("#turn-lie").textContent = p.strokes === 0 ? "teeing off" : "on " + lieName(terrainAt(p.pos)) + ` \u00B7 stroke ${p.strokes + 1}`;
     updateCaddie();
+    renderScorecard();
   }
 
   function updateMulligans() {
@@ -1055,28 +1110,6 @@
     $("#modal").classList.remove("hidden");
   }
 
-  function openLegend() {
-    const body = $("#modal-body");
-    const sw = (inner) => `<svg viewBox="0 0 34 34" width="30" height="30">${inner}</svg>`;
-    const rows = [
-      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#E4E2DA"/>`), "Fairway", "+1 to your next roll's distance."],
-      [sw(`<circle cx="17" cy="17" r="2" fill="#C6C2B8"/>`), "Rough", "Plain ground — no bonus or penalty."],
-      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#F0E8D2"/><line x1="4" y1="30" x2="30" y2="4" stroke="#D9CBA4" stroke-width="2"/>`), "Sand", "\u22121 to your next roll's distance."],
-      [sw(`<rect x="1" y="1" width="32" height="32" rx="9" fill="#969C9F"/>`), "Water", "May fly over it, never land in it."],
-      [sw(`<polygon points="11,7 18,23 4,23" fill="#3A3F3A"/><rect x="9.6" y="23" width="2.8" height="4" fill="#3A3F3A"/><circle cx="25" cy="14" r="7" fill="#3A3F3A"/><rect x="23.6" y="20" width="2.8" height="6" fill="#3A3F3A"/>`), "Trees (two shapes)", "Pines \u25B2 and broadleafs \u25CF are the same thing \u2014 both are trees. They block the shot unless struck from the fairway (or with a driver), which flies over."],
-      [sw(`<g transform="translate(17,17) rotate(45)"><polygon points="0,-8 7,6 0,2.5 -7,6" fill="#6B6F66"/></g>`), "Slope", "Rolls the ball one extra dot in the arrow's direction, chaining into any slope it lands on."],
-      [sw(`<circle cx="17" cy="17" r="7.5" fill="#FAF8F2" stroke="#24262B" stroke-width="3"/>`), "Tee", "Where every hole starts."],
-      [sw(`<circle cx="17" cy="17" r="8" fill="#24262B"/><circle cx="19.5" cy="14.5" r="1.8" fill="#FAF8F2" opacity=".5"/>`), "Cup", "Land exactly on it, or cross it and stop one dot past, to sink your ball."],
-      [sw(`<g opacity=".7"><ellipse cx="13.5" cy="18" rx="3.2" ry="5" fill="#3A3F3A" transform="rotate(-12 13.5 18)"/><ellipse cx="20.5" cy="15" rx="3.2" ry="5" fill="#3A3F3A" transform="rotate(12 20.5 15)"/></g>`), "Bigfoot", "Hidden on some courses. Click him for a bonus mulligan."],
-    ];
-    let html = `<div class="legend-grid">` + rows.map(([icon, name, desc]) =>
-      `<div class="legend-row"><div class="legend-icon">${icon}</div><div><b>${name}</b><p>${desc}</p></div></div>`
-    ).join("") + `</div>`;
-    html += `<p class="hint" style="margin-top:.6rem">Player colors are shown on the ball and in the footer beneath the board.</p>`;
-    body.innerHTML = html;
-    $("#modal").classList.remove("hidden");
-  }
-
   /* ---------------- menu / boot ---------------- */
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
@@ -1096,7 +1129,11 @@
     S.holeIdx = 0;
     S.bigfootFound = false;
     S.log = [];
+    S.caddieKey = ""; S.caddieText = "";
+    Caddie.init(S.seed);
     renderHistory();
+    renderLegend();
+    renderScorecard();
     S.ps = Array.from({ length: S.players }, (_, i) => ({
       name: S.players === 1 ? "You" : PNAMES[i],
       color: PCOLORS[i],
@@ -1160,9 +1197,7 @@
     $("#exit-btn").addEventListener("click", () => {
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
-    $("#legend-btn").addEventListener("click", openLegend);
     $("#save-btn").addEventListener("click", downloadBoardImage);
-    $("#score-btn").addEventListener("click", openScorecard);
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });
     $("#pdf-btn2").addEventListener("click", () => {
