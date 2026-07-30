@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meh Golf</title>
-<link rel="stylesheet" href="css/style.css?v=16">
+<link rel="stylesheet" href="css/style.css?v=18">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAF8F2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%2324262B'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -108,7 +108,7 @@
         <p><b>Goal.</b> Get the ball <span class="glyph">&#9675;</span> into the hole <span class="glyph">&#9679;</span>. Par is 6 on every hole; the fewest total strokes wins.</p>
         <p><b>Dice golf.</b> Roll the die to see how far the ball travels. Add 1 when hitting from the fairway, subtract 1 when hitting from sand. Then pick one of the 8 directions and the ball flies that many dots in a straight line.</p>
         <p><b>Speed golf.</b> No die: choose a club instead. Driver moves 6 (fairway only, can fly over trees), iron moves 3 (2 from sand, never over trees), putter moves 1.</p>
-        <p><b>Terrain.</b> Trees block your shot and can never be landed on &mdash; but a shot struck <i>from the fairway</i> sails over them. Water can be flown over, never landed in. Sand shortens your next hit. Slope arrows roll the ball one extra dot (and keep rolling across chained arrows).</p>
+        <p><b>Terrain.</b> Trees block your shot and can never be landed on &mdash; but a shot struck <i>from the fairway</i> sails over them. Water can be flown over, never landed in. Sand shortens your next hit. Hills come as mounds and hollows, in three sizes. A <b>mound</b> sheds the ball one dot away from its peak; a <b>hollow</b> gathers it one dot toward the bottom. Arrows on each dot show exactly which way, and a ball keeps rolling across anything it meets.</p>
         <p><b>Sinking it.</b> Land exactly on the hole and it drops. If your line crosses the hole and finishes just one dot past it, that counts too.</p>
         <p><b>Do-overs.</b> Your first shot on each hole may be re-rolled once for free. Beyond that, each player carries 6 mulligans for the whole course &mdash; spend one to re-roll any shot. You may always choose to putt (move 1) instead of using your roll.</p>
         <p><b>Multiplayer.</b> Everyone tees off in order; after that, whoever sits furthest from the hole shoots next. Keep an eye out &mdash; a bigfoot hides somewhere in about a third of all notebooks, and spotting him earns a bonus mulligan.</p>
@@ -117,7 +117,7 @@
 
     <footer class="menu-foot">
       <button id="mute-btn" class="btn ghost small">Sound: on</button>
-      <span class="credit">build <b id="build-stamp">v16</b> &middot; an homage to pencil-and-paper golf notebooks</span>
+      <span class="credit">build <b id="build-stamp">v18</b> &middot; an homage to pencil-and-paper golf notebooks</span>
     </footer>
   </div>
 </section>
@@ -129,7 +129,7 @@
     <div class="game-title">
       <b id="course-name">Course</b>
       <span id="hole-label">Hole 1 / 18</span>
-      <span class="seed-chip" id="seed-chip" title="Course seed"></span><span id="turn-chip" class="turn-chip hidden"></span><span class="build-tag" title="build version">v16</span>
+      <span class="seed-chip" id="seed-chip" title="Course seed"></span><span id="turn-chip" class="turn-chip hidden"></span><span class="build-tag" title="build version">v18</span>
     </div>
     <div class="game-bar-actions">
       <button id="pdf-btn2" class="btn ghost small" title="Download a printable paper version of this course">Print &amp; Play</button>
@@ -200,12 +200,12 @@
   </div>
 </div>
 
-<script src="js/rng.js?v=16"></script>
-<script src="js/audio.js?v=16"></script>
-<script src="js/caddie.js?v=16"></script>
-<script src="js/course.js?v=16"></script>
-<script src="js/dice.js?v=16"></script>
-<script src="js/pdf.js?v=16"></script>
-<script src="js/game.js?v=16"></script>
+<script src="js/rng.js?v=18"></script>
+<script src="js/audio.js?v=18"></script>
+<script src="js/caddie.js?v=18"></script>
+<script src="js/course.js?v=18"></script>
+<script src="js/dice.js?v=18"></script>
+<script src="js/pdf.js?v=18"></script>
+<script src="js/game.js?v=18"></script>
 </body>
 </html>

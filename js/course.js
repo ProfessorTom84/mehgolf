@@ -191,53 +191,95 @@
         }
     }
 
-    /* ---- slopes ----
-     * Two things made the old slopes pointless: they were scattered anywhere on
-     * the board (so the ball rarely landed on one), and their direction was
-     * random (so it often pointed into water or a tree, which the rules say
-     * cancels the roll entirely). Now they sit within a couple of dots of the
-     * route the ball actually travels, and every one is guaranteed to push the
-     * ball onto open ground.
+    /* ---- hills ----
+     * A hill is an AREA with a shape, not a scattered arrow. Land on a MOUND and
+     * the ball rolls one dot directly away from its peak; land in a HOLLOW and it
+     * rolls one dot toward the bottom. Direction comes from geometry, so a player
+     * can read it in advance and plan around it -- a hollow near the cup is worth
+     * aiming at, a mound beside water is a genuine hazard.
+     *
+     * Each cell inside a hill still carries a plain 0-7 direction in `slope`, so
+     * everything downstream (rolling, chaining, printing) is unchanged.
      */
-    const nSlope = scale(ri(rng, 4, 7));
-    const cand = [];
-    const seenCand = new Uint8Array(cols * rows);
+    const nHills = Math.max(1, Math.round(ri(rng, 1, 2) * K));
+    g.hills = [];
+
+    // candidate centres: near the route so the ball actually meets them
+    const spots = [];
+    const seenSpot = new Uint8Array(cols * rows);
     for (const pt of path) {
       for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
         const x = pt.x + dx, y = pt.y + dy;
         if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
         const k = y * cols + x;
-        if (seenCand[k]) continue;
+        if (seenSpot[k]) continue;
         const c = cell(g, x, y);
         if (c.t !== T.ROUGH && c.t !== T.FAIR) continue;
-        seenCand[k] = 1;
-        cand.push({ x, y });
+        seenSpot[k] = 1;
+        spots.push({ x, y });
       }
     }
-    // deterministic shuffle
-    for (let i = cand.length - 1; i > 0; i--) {
+    for (let i = spots.length - 1; i > 0; i--) {
       const j = (rng() * (i + 1)) | 0;
-      const t2 = cand[i]; cand[i] = cand[j]; cand[j] = t2;
+      const t2 = spots[i]; spots[i] = spots[j]; spots[j] = t2;
     }
 
-    let placed = 0;
-    for (const pt of cand) {
-      if (placed >= nSlope) break;
-      const c = cell(g, pt.x, pt.y);
-      if (c.slope >= 0) continue;
-      // only directions that actually move the ball somewhere playable
-      const usable = [];
-      for (let d = 0; d < 8; d++) {
-        const nx = pt.x + DIRS[d].x, ny = pt.y + DIRS[d].y;
-        if (!inB(g, nx, ny)) continue;
-        const nt = cell(g, nx, ny).t;
-        if (nt === T.WATER || nt === T.TREE) continue;   // rules cancel the roll
-        if (nx === hole.x && ny === hole.y) continue;    // don't gift the cup
-        usable.push(d);
+    const dirOf = (dx, dy) => {
+      // snap a vector to one of the 8 compass directions in DIRS order
+      const ang = Math.atan2(dx, -dy);                 // 0 = North, clockwise
+      let k = Math.round(ang / (Math.PI / 4));
+      return ((k % 8) + 8) % 8;
+    };
+
+    for (const c0 of spots) {
+      if (g.hills.length >= nHills) break;
+      // weighted toward the smaller sizes: a board of nothing but big hills
+      // means no shot ever finishes where you aimed it
+      const rRoll = rng();
+      const r = rRoll < 0.52 ? 1 : rRoll < 0.86 ? 2 : 3;   // small / medium / large
+      // don't overlap an existing hill or crowd the cup
+      let clash = false;
+      for (const h of g.hills)
+        if (Math.max(Math.abs(h.x - c0.x), Math.abs(h.y - c0.y)) <= h.r + r + 1) clash = true;
+      if (clash) continue;
+      if (Math.max(Math.abs(c0.x - hole.x), Math.abs(c0.y - hole.y)) <= r + 1) continue;
+
+      const kind = rng() < 0.5 ? "mound" : "hollow";
+      let touched = 0;
+      const claimed = [];
+
+      for (let y = c0.y - r; y <= c0.y + r; y++) {
+        for (let x = c0.x - r; x <= c0.x + r; x++) {
+          const dx = x - c0.x, dy = y - c0.y;
+          if (Math.hypot(dx, dy) > r + 0.35) continue;   // round-ish footprint
+          if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
+          const cc = cell(g, x, y);
+          if (cc.t !== T.ROUGH && cc.t !== T.FAIR) continue;
+          if (cc.slope >= 0) continue;
+
+          let dir;
+          if (dx === 0 && dy === 0) {
+            // The peak of a mound cannot hold a ball, so it tips a seeded way.
+            // The bottom of a hollow is exactly where a ball wants to sit.
+            if (kind === "hollow") { claimed.push([x, y, -1]); touched++; continue; }
+            dir = ri(rng, 0, 7);
+          } else {
+            dir = kind === "mound" ? dirOf(dx, dy) : dirOf(-dx, -dy);
+          }
+
+          // a roll that ends in water or trees is cancelled by the rules, so it
+          // would be a decoration rather than a hazard -- skip those cells
+          const nx = x + DIRS[dir].x, ny = y + DIRS[dir].y;
+          if (!inB(g, nx, ny)) continue;
+          const nt = cell(g, nx, ny).t;
+          if (nt === T.WATER || nt === T.TREE) continue;
+          claimed.push([x, y, dir]);
+          touched++;
+        }
       }
-      if (!usable.length) continue;
-      c.slope = pick(rng, usable);
-      placed++;
+      if (touched < (r === 1 ? 3 : 5)) continue;         // too chewed up to read
+      claimed.forEach(([x, y, dir]) => { if (dir >= 0) cell(g, x, y).slope = dir; });
+      g.hills.push({ x: c0.x, y: c0.y, r, kind });
     }
 
     /* ---- coverage pass ----

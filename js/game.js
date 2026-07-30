@@ -38,7 +38,7 @@
       paper: "#FAF8F2", fairway: "#E4E2DA", water: "#969C9F",
       sand: "#F0E8D2", sandHatch: "#D9CBA4",
       tree: "#3A3F3A", treeAlt: "#3A3F3A", trunk: "#3A3F3A",
-      slope: "#6B6F66", green: "#DAD8CE",
+      slope: "#6B6F66", hillUp: "#EDEBE1", hillDown: "#DCD9CC", green: "#DAD8CE",
       roughDot: "#C6C2B8", fairwayDot: "#A8A59A", sandDot: "#CBBD97", waterDot: "#EDEFEF",
       tee: "#24262B", cup: "#24262B", bigfoot: "#3A3F3A",
       boost: "#5A5F58", penalty: "#8A8272"
@@ -47,7 +47,7 @@
       paper: "#FAF8F2", fairway: "#CFE3AE", water: "#7FB6DC",
       sand: "#F6E7B2", sandHatch: "#E0C77E",
       tree: "#2F6B3A", treeAlt: "#3E7C46", trunk: "#6B4E31",
-      slope: "#8A7BB5", green: "#B4D98C",
+      slope: "#8A7BB5", hillUp: "#EFE8F4", hillDown: "#DED4EA", green: "#B4D98C",
       roughDot: "#B6BFA4", fairwayDot: "#7FA05C", sandDot: "#C9A94F", waterDot: "#DCEEF8",
       tee: "#24262B", cup: "#24262B", bigfoot: "#4A3F35",
       boost: "#1F8A46", penalty: "#C08528"
@@ -161,7 +161,33 @@
 
     const terr = el("g", {}, svg);
     const dots = el("g", {}, svg);
+    // Hill footprints sit under the features so arrows and trees stay legible.
+    const hills = el("g", {}, svg);
     const feat = el("g", {}, svg);
+    (G.hills || []).forEach(h => {
+      const cxh = px(h.x), cyh = px(h.y), rad = (h.r + 0.45) * C;
+      const up = h.kind === "mound";
+      el("circle", {
+        cx: cxh, cy: cyh, r: rad,
+        fill: up ? TH.hillUp : TH.hillDown, opacity: up ? .85 : .9
+      }, hills);
+      // contour ring: solid for a mound, dashed for a hollow
+      el("circle", {
+        cx: cxh, cy: cyh, r: rad - 3, fill: "none",
+        stroke: TH.slope, "stroke-width": 1.6, opacity: .5,
+        "stroke-dasharray": up ? "none" : "5 4"
+      }, hills);
+      if (h.r >= 2) {
+        el("circle", {
+          cx: cxh, cy: cyh, r: rad * 0.55, fill: "none",
+          stroke: TH.slope, "stroke-width": 1.2, opacity: .35,
+          "stroke-dasharray": up ? "none" : "5 4"
+        }, hills);
+      }
+      // peak marker for a mound, basin marker for a hollow
+      if (up) el("circle", { cx: cxh, cy: cyh, r: 2.6, fill: TH.slope, opacity: .8 }, hills);
+      else el("circle", { cx: cxh, cy: cyh, r: 3.4, fill: "none", stroke: TH.slope, "stroke-width": 1.8, opacity: .8 }, hills);
+    });
 
     for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++) {
       const c = cell(G, x, y), X = x * C, Y = y * C;
@@ -577,14 +603,91 @@
       opacity: kind === "slope" ? .55 : .9,
       "stroke-dasharray": kind === "slope" ? "2 6" : "none"
     }, t);
-    const len = Math.hypot(px(b.x) - px(a.x), px(b.y) - px(a.y));
-    if (kind !== "slope") {
-      line.setAttribute("stroke-dasharray", len);
-      line.setAttribute("stroke-dashoffset", len);
-      line.style.transition = `stroke-dashoffset ${Math.min(0.45, len / 500)}s ease-out`;
-      requestAnimationFrame(() => requestAnimationFrame(() => { line.setAttribute("stroke-dashoffset", 0); }));
+    const ax = px(a.x) + seg.j1x, ay = px(a.y) + seg.j1y;
+    const bx = px(b.x) + seg.j2x, by = px(b.y) + seg.j2y;
+    const len = Math.hypot(bx - ax, by - ay);
+    const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Reduced motion (or a slope trickle) keeps the old quick line draw.
+    if (calm) {
+      if (kind !== "slope") {
+        line.setAttribute("stroke-dasharray", len);
+        line.setAttribute("stroke-dashoffset", len);
+        line.style.transition = "stroke-dashoffset .18s linear";
+        requestAnimationFrame(() => requestAnimationFrame(() => line.setAttribute("stroke-dashoffset", 0)));
+      }
+      setTimeout(done, kind === "slope" ? 140 : 220);
+      return;
     }
-    setTimeout(done, kind === "slope" ? 220 : Math.min(480, len / 500 * 1000 + 60));
+
+    /* The ball is struck and flies: it lifts off the paper (drawn as growing,
+     * with its shadow sliding out and shrinking), then lands, bounces twice and
+     * settles. The trail is drawn exactly in step with it, so the line is the
+     * ball's path rather than a separate effect. */
+    line.setAttribute("stroke-dasharray", len);
+    line.setAttribute("stroke-dashoffset", len);
+
+    const rolling = kind === "slope";
+    const FLIGHT = rolling ? 190 : Math.max(300, Math.min(660, 240 + len * 1.15));
+    const SETTLE = rolling ? 90 : 200;
+    const PEAK = rolling ? 3 : Math.min(16, 7 + len * 0.055);
+
+    const live = document.getElementById("ball-" + S.cur);
+    if (live) live.style.opacity = "0";
+
+    const fly = el("g", { "pointer-events": "none" }, t);
+    const shadow = el("ellipse", { cx: ax, cy: ay, rx: 5, ry: 3.2, fill: "#1c1f1a", opacity: .2 }, fly);
+    const bob = el("circle", { cx: ax, cy: ay, r: 6, fill: color, stroke: "#FAF8F2", "stroke-width": 1.6 }, fly);
+    let ring = null;
+
+    const ease = u => 1 - Math.pow(1 - u, 2);        // decelerating flight
+    let t0 = null;
+
+    function step(ts) {
+      if (t0 == null) t0 = ts;
+      const el2 = ts - t0;
+
+      if (el2 <= FLIGHT) {
+        const u = el2 / FLIGHT, e = rolling ? u : ease(u);
+        const x = ax + (bx - ax) * e, y = ay + (by - ay) * e;
+        const lift = Math.sin(Math.PI * u) * PEAK;
+        bob.setAttribute("cx", x); bob.setAttribute("cy", y - lift);
+        bob.setAttribute("r", (6 + lift * 0.09).toFixed(2));
+        shadow.setAttribute("cx", x + lift * 0.18);
+        shadow.setAttribute("cy", y + 1.5);
+        shadow.setAttribute("rx", (5 - lift * 0.07).toFixed(2));
+        shadow.setAttribute("ry", (3.2 - lift * 0.05).toFixed(2));
+        shadow.setAttribute("opacity", (0.2 - lift * 0.006).toFixed(3));
+        line.setAttribute("stroke-dashoffset", len * (1 - e));
+        requestAnimationFrame(step);
+
+      } else if (el2 <= FLIGHT + SETTLE) {
+        const u = (el2 - FLIGHT) / SETTLE;
+        if (!ring && !rolling) {
+          ring = el("circle", { cx: bx, cy: by, r: 3, fill: "none", stroke: color, "stroke-width": 2, opacity: .55 }, fly);
+        }
+        // two decaying hops on the spot
+        const hop = Math.abs(Math.sin(Math.PI * 2 * u)) * (rolling ? 2 : 5) * (1 - u);
+        bob.setAttribute("cx", bx); bob.setAttribute("cy", by - hop);
+        bob.setAttribute("r", (6 - (hop < 0.4 ? 0.7 : 0)).toFixed(2));   // squash on contact
+        shadow.setAttribute("cx", bx); shadow.setAttribute("cy", by + 1.5);
+        shadow.setAttribute("rx", 5); shadow.setAttribute("ry", 3.2);
+        shadow.setAttribute("opacity", 0.2);
+        line.setAttribute("stroke-dashoffset", 0);
+        if (ring) {
+          ring.setAttribute("r", (3 + u * 12).toFixed(1));
+          ring.setAttribute("opacity", (0.55 * (1 - u)).toFixed(3));
+        }
+        requestAnimationFrame(step);
+
+      } else {
+        line.setAttribute("stroke-dashoffset", 0);
+        fly.remove();
+        if (live) live.style.opacity = "";
+        done();
+      }
+    }
+    requestAnimationFrame(step);
   }
 
   function commitMove(r, kind) {
@@ -863,10 +966,16 @@
       [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.sand}"/><line x1="3" y1="15" x2="15" y2="3" stroke="${T2.sandHatch}" stroke-width="2"/>`, "Sand", "\u22121 dot"],
       [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.water}"/>`, "Water", "fly over, never land"],
       [`<polygon points="6,3 11,13 1,13" fill="${T2.tree}"/><circle cx="14" cy="7" r="4" fill="${T2.treeAlt}"/>`, "Trees", "block unless from fairway"],
+      [`<circle cx="9" cy="9" r="8" fill="${T2.hillUp}"/><circle cx="9" cy="9" r="6" fill="none" stroke="${T2.slope}" stroke-width="1.2" opacity=".6"/>` +
+       `<circle cx="9" cy="9" r="1.8" fill="${T2.slope}"/>`,
+       "Mound", "rolls the ball 1 dot AWAY from the peak"],
+      [`<circle cx="9" cy="9" r="8" fill="${T2.hillDown}"/><circle cx="9" cy="9" r="6" fill="none" stroke="${T2.slope}" stroke-width="1.2" stroke-dasharray="3 2" opacity=".7"/>` +
+       `<circle cx="9" cy="9" r="2.4" fill="none" stroke="${T2.slope}" stroke-width="1.4"/>`,
+       "Hollow", "rolls the ball 1 dot TOWARD the bottom"],
       [`<g transform="translate(9,9) rotate(45)">` +
        `<line x1="0" y1="6" x2="0" y2="-1" stroke="${T2.slope}" stroke-width="2.2" stroke-linecap="round"/>` +
        `<polygon points="0,-7.5 4.5,-0.5 -4.5,-0.5" fill="${T2.slope}"/></g>`,
-       "Slope", "arrow shows which way it rolls the ball 1 dot"],
+       "Arrows", "show exactly which way that dot rolls"],
       [`<circle cx="9" cy="9" r="5" fill="${T2.paper}" stroke="${T2.tee}" stroke-width="2.4"/>`, "Tee", "start of the hole"],
       [`<circle cx="9" cy="9" r="5.5" fill="${T2.cup}"/>`, "Cup", "land on it, or 1 past"],
       [`<g opacity=".75"><ellipse cx="6" cy="10" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/><ellipse cx="12" cy="8" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/></g>`, "Bigfoot", "click for a mulligan"],
@@ -951,7 +1060,18 @@
     }
     if (c.slope >= 0) {
       const dn = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][c.slope];
-      return ["Slope \u2014 runs " + dn, "A ball landing here rolls one dot " + dn + ", and keeps rolling across any slope it meets."];
+      const h = (G.hills || []).find(hh =>
+        Math.hypot(hh.x - x, hh.y - y) <= hh.r + 0.35);
+      const size = h ? (h.r === 1 ? "Small" : h.r === 2 ? "Medium" : "Large") : "";
+      if (h) {
+        return [
+          `${size} ${h.kind} \u2014 rolls ${dn}`,
+          h.kind === "mound"
+            ? "A mound sheds the ball: it rolls one dot away from the peak, and keeps rolling across anything it meets."
+            : "A hollow gathers the ball: it rolls one dot toward the bottom, and keeps rolling across anything it meets."
+        ];
+      }
+      return ["Slope \u2014 runs " + dn, "A ball landing here rolls one dot " + dn + ", and keeps rolling."];
     }
     return TERRAIN_INFO[c.t] || null;
   }
