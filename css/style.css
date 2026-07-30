@@ -198,6 +198,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   position:relative;
   box-shadow:0 1px 0 #d8d4c8 inset;
 }
+/* Containing block for the confetti / toast overlays; no layout effect. */
+#board-wrap{position:relative}
 #board-wrap svg{display:block; width:min(62vw, 560px); height:auto; max-width:100%}
 .page-foot{
   display:flex; gap:1rem; justify-content:space-between; align-items:center;
@@ -300,6 +302,66 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .sc-table tr.tot td{border-top:2px solid var(--ink); border-bottom:0; font-weight:700; padding-top:.25rem}
 .sc-under{color:#1F8A46} .sc-over{color:#B4762A}
 
+/* ---------- whose turn it is ---------- */
+.tray.multi{
+  border-top:5px solid var(--turn, var(--ink));
+  box-shadow:0 14px 34px rgba(0,0,0,.34), inset 0 0 0 1px color-mix(in srgb, var(--turn, #000) 22%, transparent);
+}
+.tray.multi .panel-head{color:var(--turn, #6a6d64); border-bottom-color:var(--turn, var(--ink))}
+.turn-chip{
+  display:inline-block; margin-left:.5rem; padding:.05rem .45rem; border-radius:999px;
+  font-size:.66rem; font-weight:700; color:#fff; letter-spacing:.08em; vertical-align:2px;
+}
+.turn-toast{
+  position:absolute; left:50%; top:14px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:.4rem;
+  background:var(--paper); border:2px solid var(--turn, var(--ink)); border-radius:999px;
+  padding:.28rem .8rem; font-size:.82rem; font-weight:700; letter-spacing:.06em;
+  box-shadow:0 6px 16px rgba(0,0,0,.22); pointer-events:none; z-index:5;
+  animation:toast-in 1.5s ease-out forwards;
+}
+.turn-toast .tt-dot{width:9px; height:9px; border-radius:50%; background:var(--turn, var(--ink))}
+@keyframes toast-in{
+  0%{opacity:0; transform:translateX(-50%) translateY(-8px)}
+  14%{opacity:1; transform:translateX(-50%) translateY(0)}
+  78%{opacity:1}
+  100%{opacity:0; transform:translateX(-50%) translateY(-6px)}
+}
+@keyframes halo-pulse{
+  0%,100%{opacity:.35; r:11}
+  50%    {opacity:.95; r:14}
+}
+.ball-halo{animation:halo-pulse 1.5s ease-in-out infinite}
+
+/* ---------- sinking celebration ---------- */
+.party{position:absolute; width:0; height:0; pointer-events:none; z-index:6}
+.party .confetti{
+  position:absolute; left:0; top:0; display:block;
+  transform:translate(-50%,-50%);
+  animation:confetti-fly var(--dur,1s) cubic-bezier(.18,.7,.3,1) var(--del,0s) forwards;
+}
+@keyframes confetti-fly{
+  0%  {opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(0)}
+  12% {opacity:1}
+  70% {opacity:1}
+  100%{opacity:0;
+       transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 40px))
+                 scale(1) rotate(var(--rot))}
+}
+.party-ring{
+  position:absolute; left:0; top:0; width:18px; height:18px; margin:-9px 0 0 -9px;
+  border:3px solid #000; border-radius:50%;
+  animation:ring-pop .75s ease-out forwards;
+}
+@keyframes ring-pop{
+  0%  {opacity:.9; transform:scale(.35)}
+  100%{opacity:0;  transform:scale(3.4)}
+}
+@media (prefers-reduced-motion: reduce){
+  .party{display:none}
+  .ball-halo, .turn-toast{animation:none}
+}
+
 /* ---------- board ambience ---------- */
 /* A slow breeze. Rotation only, anchored at each trunk, so nothing reflows and
    the board's measured size is untouched. */
@@ -360,6 +422,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 /* ---------- history extras ---------- */
 .h-die{vertical-align:-3px; margin-right:.15rem}
 .h-mod{font-size:.72rem; font-weight:700}
+.h-eq{font-size:.72rem; font-weight:700; color:#5b5e57}
 .h-mod.up{color:#1F8A46}
 .h-mod.dn{color:#B4762A}
 .h-move{font-weight:700}

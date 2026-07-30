@@ -20,7 +20,7 @@
     bigfootFound: false,
     wobble: null,              // seeded rng for hand-drawn jitter
     log: [],                   // shot history
-    caddieKey: "", caddieText: "",
+    caddieKey: "", caddieText: "", lastShooter: -1,
     theme: "colour"           // "colour" | "ink"
   };
 
@@ -140,6 +140,12 @@
     return { steps, end: p, holed };
   }
 
+  /** Dots gained (+) or lost (-) on a shot, derived from what actually happened. */
+  function segMod(seg) {
+    if (seg.kind !== "roll" || seg.die == null) return 0;
+    return seg.dist - seg.die;
+  }
+
   /* ---------------- board rendering ---------------- */
   function renderBoard() {
     const G = g();
@@ -183,8 +189,14 @@
           el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: TH.trunk }, g0);
         }
       } else if (c.slope >= 0) {
-        const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .85 }, feat);
-        el("polygon", { points: "0,-8 7,6 0,2.5 -7,6", fill: TH.slope }, a);
+        // A shaft plus a solid head: at a glance you can tell which way it
+        // pushes. The old dart shape was symmetrical enough to read backwards.
+        const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .9 }, feat);
+        el("line", {
+          x1: 0, y1: 8, x2: 0, y2: -2,
+          stroke: TH.slope, "stroke-width": 3, "stroke-linecap": "round"
+        }, a);
+        el("polygon", { points: "0,-11 6.5,-1 -6.5,-1", fill: TH.slope }, a);
       } else {
         const col = c.t === T.WATER ? TH.waterDot : c.t === T.FAIR ? TH.fairwayDot
           : c.t === T.SAND ? TH.sandDot : TH.roughDot;
@@ -361,22 +373,14 @@
   function drawTrails() {
     const t = $("#trails"); t.innerHTML = "";
     const TH = theme();
+
     S.ps.forEach(p => {
       p.trail.forEach(seg => {
         const x1 = px(seg.a.x) + seg.j1x, y1 = px(seg.a.y) + seg.j1y;
         const x2 = px(seg.b.x) + seg.j2x, y2 = px(seg.b.y) + seg.j2y;
+        const mod = segMod(seg);
 
-        // A coloured casing under the stroke says what the ground did to the
-        // shot: boosted off the fairway, shortened out of sand, or neither.
-        if (seg.mod) {
-          el("line", {
-            x1, y1, x2, y2,
-            stroke: seg.mod > 0 ? TH.boost : TH.penalty,
-            "stroke-width": 8.5, "stroke-linecap": "round",
-            opacity: .4
-          }, t);
-        }
-
+        // the shot itself
         el("line", {
           x1, y1, x2, y2,
           stroke: p.color, "stroke-width": 3, class: "stroke-line",
@@ -384,12 +388,11 @@
           "stroke-dasharray": seg.kind === "slope" ? "2 6" : "none"
         }, t);
 
-        // One tick per dot travelled, so the length of a shot is countable and
-        // three short hits can never be mistaken for one long one.
+        // a tick at every dot crossed, so the length is countable
         if (seg.kind !== "slope" && seg.dist > 1) {
           const dx = (x2 - x1) / seg.dist, dy = (y2 - y1) / seg.dist;
           const L = Math.hypot(dx, dy) || 1;
-          const nx = -dy / L * 3.6, ny = dx / L * 3.6;      // unit perpendicular
+          const nx = -dy / L * 3.6, ny = dx / L * 3.6;
           for (let k = 1; k < seg.dist; k++) {
             const cx = x1 + dx * k, cy = y1 + dy * k;
             el("line", {
@@ -398,28 +401,70 @@
             }, t);
           }
         }
+
+        if (!mod) return;
+        const ux = (x2 - x1) / (seg.dist || 1), uy = (y2 - y1) / (seg.dist || 1);
+
+        if (mod > 0) {
+          // The dot the fairway GAVE you: the last stretch of the shot, redrawn
+          // thick and green with an arrowhead, so you can see the shot reach
+          // one dot further than the die alone would have carried it.
+          const gx = x2 - ux * mod, gy = y2 - uy * mod;
+          el("line", {
+            x1: gx, y1: gy, x2, y2,
+            stroke: TH.boost, "stroke-width": 6, "stroke-linecap": "round", opacity: .9
+          }, t);
+          const ang = Math.atan2(uy, ux) * 180 / Math.PI;
+          el("polygon", {
+            points: "0,-4.5 8,0 0,4.5", fill: TH.boost,
+            transform: `translate(${x2.toFixed(1)},${y2.toFixed(1)}) rotate(${ang.toFixed(1)})`
+          }, t);
+        } else {
+          // The dot sand TOOK: a ghost stub past where the ball stopped, dashed
+          // and open-ended so it plainly is not part of the shot.
+          const lx = x2 - ux * mod, ly = y2 - uy * mod;   // mod is negative
+          el("line", {
+            x1: x2, y1: y2, x2: lx, y2: ly,
+            stroke: TH.penalty, "stroke-width": 2.4, "stroke-dasharray": "3 4",
+            "stroke-linecap": "round", opacity: .95
+          }, t);
+          el("circle", {
+            cx: lx, cy: ly, r: 4, fill: "none",
+            stroke: TH.penalty, "stroke-width": 2, opacity: .95
+          }, t);
+        }
       });
 
-      // Numbered node at the end of each struck shot, with a +1/-1 chip when
-      // the terrain changed the distance.
+      // Numbered node at the end of each struck shot, plus a pill spelling out
+      // the arithmetic whenever the ground changed the distance.
       const struck = p.trail.filter(s2 => s2.kind !== "slope");
       struck.forEach((seg, i) => {
         const cx = px(seg.b.x) + seg.j2x, cy = px(seg.b.y) + seg.j2y;
-        if (i === struck.length - 1 && !p.holed) return;    // live ball sits here
-        el("circle", { cx, cy, r: 7.5, fill: TH.paper, stroke: p.color, "stroke-width": 2, opacity: .95 }, t);
-        el("text", {
-          x: cx, y: cy + 3.4, "text-anchor": "middle", "font-size": 9,
-          "font-family": "Courier New, monospace", "font-weight": "700",
-          fill: p.color, class: "shot-num"
-        }, t).textContent = i + 1;
-        if (seg.mod) {
-          const mx = (px(seg.a.x) + cx) / 2, my = (px(seg.a.y) + cy) / 2;
+        const last = i === struck.length - 1 && !p.holed;
+        if (!last) {
+          el("circle", { cx, cy, r: 7.5, fill: TH.paper, stroke: p.color, "stroke-width": 2, opacity: .95 }, t);
           el("text", {
-            x: mx, y: my - 7, "text-anchor": "middle", "font-size": 9.5,
+            x: cx, y: cy + 3.4, "text-anchor": "middle", "font-size": 9,
             "font-family": "Courier New, monospace", "font-weight": "700",
-            fill: seg.mod > 0 ? TH.boost : TH.penalty, class: "shot-num"
-          }, t).textContent = seg.mod > 0 ? "+1" : "\u22121";
+            fill: p.color, class: "shot-num"
+          }, t).textContent = i + 1;
         }
+
+        const mod = segMod(seg);
+        if (!mod) return;
+        const col = mod > 0 ? TH.boost : TH.penalty;
+        const label = `${seg.die}${mod > 0 ? "+" : "\u2212"}${Math.abs(mod)}=${seg.dist}`;
+        const mx = (px(seg.a.x) + cx) / 2, my = (px(seg.a.y) + cy) / 2;
+        const wpx = label.length * 5.6 + 10;
+        const gp = el("g", { class: "shot-num" }, t);
+        el("rect", {
+          x: mx - wpx / 2, y: my - 19, width: wpx, height: 14, rx: 7,
+          fill: TH.paper, stroke: col, "stroke-width": 1.6
+        }, gp);
+        el("text", {
+          x: mx, y: my - 8.6, "text-anchor": "middle", "font-size": 9.2,
+          "font-family": "Courier New, monospace", "font-weight": "700", fill: col
+        }, gp).textContent = label;
       });
     });
   }
@@ -430,8 +475,15 @@
       if (p.holed) return;
       const grp = el("g", { class: "ball-current", id: "ball-" + i }, b);
       el("circle", { cx: px(p.pos.x), cy: px(p.pos.y), r: 7, fill: theme().paper, stroke: p.color, "stroke-width": 3.2 }, grp);
-      if (i === S.cur && (S.phase === "aim" || S.phase === "rolled"))
-        el("circle", { cx: px(p.pos.x), cy: px(p.pos.y), r: 12, fill: "none", stroke: p.color, "stroke-width": 1.5, "stroke-dasharray": "3 4", opacity: .8 }, grp);
+      // The player about to shoot gets a pulsing halo for the whole turn, so
+      // the board itself says who is up -- not just the side panel.
+      if (i === S.cur && S.phase !== "between" && S.phase !== "over") {
+        el("circle", {
+          cx: px(p.pos.x), cy: px(p.pos.y), r: 12, fill: "none",
+          stroke: p.color, "stroke-width": 2, "stroke-dasharray": "3 4",
+          opacity: .85, class: S.ps.length > 1 ? "ball-halo" : ""
+        }, grp);
+      }
     });
   }
 
@@ -484,11 +536,16 @@
   function animateSegment(a, b, kind, color, done) {
     const t = $("#trails");
     const fromT = terrainAt(a);
+    const travelled = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
     const seg = {
       a, b, kind,
-      // what the ground did to this shot, so the trail can show it afterwards
-      mod: kind === "slope" ? 0 : (fromT === T.FAIR ? 1 : fromT === T.SAND ? -1 : 0),
-      dist: Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)),
+      // The die face and the dots actually travelled. The modifier is DERIVED
+      // from these two rather than from the terrain, because effMove() clamps to
+      // 1..7 -- rolling a 1 out of sand still travels 1 dot, so the terrain says
+      // "-1" while nothing was actually lost. Putts always move 1 and are never
+      // modified, so they carry no die at all.
+      die: kind === "roll" ? S.rolled : null,
+      dist: travelled,
       j1x: jitter(), j1y: jitter(), j2x: jitter(), j2y: jitter()
     };
     P().trail.push(seg);
@@ -541,6 +598,61 @@
     });
   }
 
+  /**
+   * Celebration at the cup: a confetti burst plus an expanding ring. Rendered as
+   * an absolutely-positioned overlay inside the board wrapper with
+   * pointer-events off, so it cannot touch layout or be captured in a saved
+   * image. Scales with how good the score was.
+   */
+  function celebrate(p, strokes) {
+    const host = $("#board-wrap");
+    const svg = document.getElementById("board");
+    if (!host || !svg) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const G = g();
+    const r = svg.getBoundingClientRect(), h = host.getBoundingClientRect();
+    const vw = Number(svg.dataset.vw) || 1, vh = Number(svg.dataset.vh) || 1;
+    const cxp = (r.left - h.left) + (px(G.hole.x) / vw) * r.width;
+    const cyp = (r.top - h.top) + (px(G.hole.y) / vh) * r.height;
+
+    const layer = document.createElement("div");
+    layer.className = "party";
+    layer.style.left = cxp + "px";
+    layer.style.top = cyp + "px";
+
+    // a hole-in-one deserves noticeably more than a bogey
+    const under = 6 - strokes;
+    const count = strokes === 1 ? 46 : under >= 2 ? 34 : under >= 0 ? 24 : 14;
+    const TH = theme();
+    const palette = [p.color, TH.boost, TH.slope, "#E8C15A", TH.cup];
+
+    const ring = document.createElement("div");
+    ring.className = "party-ring";
+    ring.style.borderColor = p.color;
+    layer.appendChild(ring);
+
+    for (let i = 0; i < count; i++) {
+      const bit = document.createElement("i");
+      const ang = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+      const dist2 = 42 + Math.random() * (strokes === 1 ? 120 : 78);
+      bit.className = "confetti";
+      bit.style.background = palette[(Math.random() * palette.length) | 0];
+      bit.style.setProperty("--dx", (Math.cos(ang) * dist2).toFixed(1) + "px");
+      bit.style.setProperty("--dy", (Math.sin(ang) * dist2 - 26).toFixed(1) + "px");
+      bit.style.setProperty("--rot", ((Math.random() * 720) - 360).toFixed(0) + "deg");
+      bit.style.setProperty("--del", (Math.random() * 0.12).toFixed(2) + "s");
+      bit.style.setProperty("--dur", (0.85 + Math.random() * 0.55).toFixed(2) + "s");
+      if (Math.random() < 0.4) bit.style.borderRadius = "50%";
+      const sz = 4 + Math.random() * 4;
+      bit.style.width = sz.toFixed(1) + "px";
+      bit.style.height = (sz * (0.5 + Math.random() * 0.8)).toFixed(1) + "px";
+      layer.appendChild(bit);
+    }
+    host.appendChild(layer);
+    setTimeout(() => layer.remove(), 1900);
+  }
+
   function sink() {
     const p = P();
     p.holed = true;
@@ -548,6 +660,7 @@
     SFX.sink();
     const ball = $("#ball-" + S.cur);
     if (ball) ball.classList.add("sinking");
+    celebrate(p, p.strokes);
     const par = 6, diff = p.strokes - par;
     const word = p.strokes === 1 ? "HOLE IN ONE!" :
       diff <= -3 ? "Albatross!" : diff === -2 ? "Eagle!" : diff === -1 ? "Birdie!" :
@@ -576,6 +689,21 @@
     S.cur = best;
   }
 
+  /** Brief overlay naming the next shooter, on player change in multiplayer. */
+  function turnToast(p) {
+    if (S.ps.length < 2) return;
+    const host = $("#board-wrap");
+    if (!host) return;
+    const old2 = host.querySelector(".turn-toast");
+    if (old2) old2.remove();
+    const el2 = document.createElement("div");
+    el2.className = "turn-toast";
+    el2.style.setProperty("--turn", p.color);
+    el2.innerHTML = `<span class="tt-dot"></span>${p.name}'s turn`;
+    host.appendChild(el2);
+    setTimeout(() => el2.remove(), 1500);
+  }
+
   /* ---------------- turn machine ---------------- */
   function startTurn(quiet) {
     const p = P();
@@ -587,6 +715,7 @@
       nextPlayer();
       return startTurn(true);
     }
+    if (S.lastShooter !== S.cur) { turnToast(P()); S.lastShooter = S.cur; }
     S.phase = "roll";
     S.rolled = 0;
     updateTurnCard(); updateMulligans(); drawBalls();
@@ -703,29 +832,42 @@
   }
 
   /* ---------------- inline legend ---------------- */
-  const LEGEND_ROWS = [
-    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#E4E2DA"/>`, "Fairway", "+1 dot, flies trees"],
-    [`<circle cx="9" cy="9" r="2" fill="#C6C2B8"/>`, "Rough", "no bonus"],
-    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#F0E8D2"/><line x1="3" y1="15" x2="15" y2="3" stroke="#D9CBA4" stroke-width="2"/>`, "Sand", "\u22121 dot"],
-    [`<rect x="1" y="1" width="16" height="16" rx="5" fill="#969C9F"/>`, "Water", "fly over, never land"],
-    [`<polygon points="6,3 11,13 1,13" fill="#3A3F3A"/><circle cx="14" cy="7" r="4" fill="#3A3F3A"/>`, "Trees", "block unless from fairway"],
-    [`<g transform="translate(9,9) rotate(45)"><polygon points="0,-5 4,4 0,1.5 -4,4" fill="#6B6F66"/></g>`, "Slope", "rolls ball 1 more"],
-    [`<circle cx="9" cy="9" r="5" fill="#FAF8F2" stroke="#24262B" stroke-width="2.4"/>`, "Tee", "start of the hole"],
-    [`<circle cx="9" cy="9" r="5.5" fill="#24262B"/>`, "Cup", "land on it, or 1 past"],
-    [`<g opacity=".75"><ellipse cx="6" cy="10" rx="2.2" ry="3.4" fill="#3A3F3A"/><ellipse cx="12" cy="8" rx="2.2" ry="3.4" fill="#3A3F3A"/></g>`, "Bigfoot", "click for a mulligan"]
-  ];
+  /** Legend rows, built from the live palette so they always match the board. */
+  function legendRows() {
+    const T2 = theme();
+    const sw = (inner) => inner;
+    return [
+      [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.fairway}"/>`, "Fairway", "+1 dot, flies trees"],
+      [`<circle cx="9" cy="9" r="2" fill="${T2.roughDot}"/>`, "Rough", "no bonus"],
+      [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.sand}"/><line x1="3" y1="15" x2="15" y2="3" stroke="${T2.sandHatch}" stroke-width="2"/>`, "Sand", "\u22121 dot"],
+      [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.water}"/>`, "Water", "fly over, never land"],
+      [`<polygon points="6,3 11,13 1,13" fill="${T2.tree}"/><circle cx="14" cy="7" r="4" fill="${T2.treeAlt}"/>`, "Trees", "block unless from fairway"],
+      [`<g transform="translate(9,9) rotate(45)">` +
+       `<line x1="0" y1="6" x2="0" y2="-1" stroke="${T2.slope}" stroke-width="2.2" stroke-linecap="round"/>` +
+       `<polygon points="0,-7.5 4.5,-0.5 -4.5,-0.5" fill="${T2.slope}"/></g>`,
+       "Slope", "arrow shows which way it rolls the ball 1 dot"],
+      [`<circle cx="9" cy="9" r="5" fill="${T2.paper}" stroke="${T2.tee}" stroke-width="2.4"/>`, "Tee", "start of the hole"],
+      [`<circle cx="9" cy="9" r="5.5" fill="${T2.cup}"/>`, "Cup", "land on it, or 1 past"],
+      [`<g opacity=".75"><ellipse cx="6" cy="10" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/><ellipse cx="12" cy="8" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/></g>`, "Bigfoot", "click for a mulligan"],
+      // --- how a shot is marked up ---
+      [`<line x1="1" y1="13" x2="9" y2="7" stroke="#8a8d84" stroke-width="2"/>` +
+       `<line x1="9" y1="7" x2="17" y2="2" stroke="${T2.boost}" stroke-width="4.5" stroke-linecap="round"/>`,
+       "+1 gained", "thick green = the dot the fairway added"],
+      [`<line x1="1" y1="13" x2="10" y2="7" stroke="#8a8d84" stroke-width="2"/>` +
+       `<line x1="10" y1="7" x2="15" y2="4" stroke="${T2.penalty}" stroke-width="2" stroke-dasharray="3 2"/>` +
+       `<circle cx="16" cy="3" r="2.4" fill="none" stroke="${T2.penalty}" stroke-width="1.5"/>`,
+       "\u22121 lost", "dashed ring = the dot sand took away"],
+      [`<line x1="2" y1="14" x2="16" y2="4" stroke="#8a8d84" stroke-width="1.8"/>` +
+       `<line x1="6.5" y1="8.5" x2="10.5" y2="11.5" stroke="#8a8d84" stroke-width="1.6"/>`,
+       "Tick marks", "one per dot travelled"]
+    ];
+  }
 
   function renderLegend() {
     const box = $("#legend-inline");
     if (!box) return;
-    const TH = theme();
-    const paint = str => str
-      .replace(/#E4E2DA/g, TH.fairway).replace(/#C6C2B8/g, TH.roughDot)
-      .replace(/#F0E8D2/g, TH.sand).replace(/#D9CBA4/g, TH.sandHatch)
-      .replace(/#969C9F/g, TH.water).replace(/#3A3F3A/g, TH.tree)
-      .replace(/#6B6F66/g, TH.slope);
-    box.innerHTML = LEGEND_ROWS.map(([icon, name, note]) =>
-      `<div class="lg-row"><svg viewBox="0 0 18 18" width="17" height="17">${paint(icon)}</svg>` +
+    box.innerHTML = legendRows().map(([icon, name, note]) =>
+      `<div class="lg-row"><svg viewBox="0 0 18 18" width="17" height="17">${icon}</svg>` +
       `<b>${name}</b><span>${note}</span></div>`).join("");
   }
 
@@ -879,16 +1021,12 @@
   function logShot(p, kind, from, r) {
     const clubName = kind === "driver" ? "Driver" : kind === "iron" ? "Iron"
       : kind === "putt" ? "Putt" : "Hit";
-    // For dice golf record the raw die face AND the terrain modifier, so the
-    // history explains why the ball travelled the distance it did.
+    // Record the die face and the dots actually travelled; the modifier is the
+    // difference between them, so the history can never claim a bonus or
+    // penalty that the shot did not really receive.
     let roll = null;
     if (kind === "roll") {
-      const fromT = terrainAt(from);
-      roll = {
-        die: S.rolled,
-        mod: fromT === T.FAIR ? 1 : fromT === T.SAND ? -1 : 0,
-        moved: S.moveN
-      };
+      roll = { die: S.rolled, moved: S.moveN, mod: S.moveN - S.rolled };
     }
     S.log.push({
       hole: S.holeIdx,
@@ -942,9 +1080,12 @@
           : "";
         let what;
         if (e.roll) {
-          const m = e.roll.mod > 0 ? ` <span class="h-mod up">+1 fairway</span>`
-            : e.roll.mod < 0 ? ` <span class="h-mod dn">\u22121 sand</span>` : "";
-          what = `${dieGlyph(e.roll.die, e.color)}${m} <span class="h-move">\u2192 ${e.roll.moved} ${e.dir}</span>`;
+          const md = e.roll.mod;
+          const sum = md
+            ? ` <span class="h-mod ${md > 0 ? "up" : "dn"}">${md > 0 ? "+" : "\u2212"}${Math.abs(md)} ${md > 0 ? "fairway" : "sand"}</span>` +
+              ` <span class="h-eq">= ${e.roll.moved}</span>`
+            : "";
+          what = `${dieGlyph(e.roll.die, e.color)}${sum} <span class="h-move">\u2192 ${md ? "" : e.roll.moved + " "}${e.dir}</span>`;
         } else {
           what = `<span class="h-club">${e.club}</span> <span class="h-move">\u2192 ${e.dist} ${e.dir}</span>`;
         }
@@ -1074,11 +1215,14 @@
           mk("circle", { cx: qx * 17 / 16, cy: qy * 17 / 16, r: 1.8, fill: e.color }, dg));
         tx += 24;
         if (e.roll.mod) {
-          T_(svg, tx, ry, 10, 700, e.roll.mod > 0 ? "#1F8A46" : "#B4762A",
-            e.roll.mod > 0 ? "+1" : "\u22121");
+          const md = e.roll.mod;
+          T_(svg, tx, ry, 10.5, 700, md > 0 ? "#1F8A46" : "#B4762A",
+            `${md > 0 ? "+" : "\u2212"}${Math.abs(md)}`);
           tx += 20;
+          T_(svg, tx, ry, 11, 700, "#5b5e57", `= ${e.roll.moved}`);
+          tx += 34;
         }
-        T_(svg, tx, ry, 12, 700, "#24262B", `\u2192 ${e.roll.moved} ${e.dir}`);
+        T_(svg, tx, ry, 12, 700, "#24262B", `\u2192 ${e.roll.mod ? "" : e.roll.moved + " "}${e.dir}`);
       } else {
         T_(svg, tx, ry, 11, 700, "#24262B", e.club);
         tx += 52;
@@ -1194,6 +1338,22 @@
 
   function updateTurnCard() {
     const p = P();
+    const multi = S.ps.length > 1;
+    // In multiplayer the whole panel takes the active player's colour, and the
+    // heading names them, so it is hard to shoot for the wrong person.
+    const tray = document.querySelector(".tray");
+    if (tray) {
+      tray.style.setProperty("--turn", p.color);
+      tray.classList.toggle("multi", multi);
+    }
+    const head = document.querySelector(".tray .panel-head");
+    if (head) head.textContent = multi ? `${p.name}'s turn` : "Now shooting";
+    const bar = $("#turn-chip");
+    if (bar) {
+      bar.textContent = multi ? p.name : "";
+      bar.style.background = p.color;
+      bar.classList.toggle("hidden", !multi);
+    }
     $("#turn-player .dot").style.background = p.color;
     $("#turn-player .nm").textContent = p.name;
     $("#turn-lie").textContent = p.strokes === 0 ? "teeing off" : "on " + lieName(terrainAt(p.pos)) + ` \u00B7 stroke ${p.strokes + 1}`;

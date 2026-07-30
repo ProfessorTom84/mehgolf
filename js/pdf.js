@@ -44,16 +44,31 @@
     };
   }
 
-  const SLOPE_PTS = [ // unit arrow per direction index (matches Course.DIRS)
-    [[0, -1], [0.8, 0.7], [-0.8, 0.7]],       // N
-    [[0.8, -0.8], [0.5, 0.9], [-0.9, -0.5]],  // NE
-    [[1, 0], [-0.7, 0.8], [-0.7, -0.8]],      // E
-    [[0.8, 0.8], [-0.9, 0.5], [0.5, -0.9]],   // SE
-    [[0, 1], [-0.8, -0.7], [0.8, -0.7]],      // S
-    [[-0.8, 0.8], [-0.5, -0.9], [0.9, 0.5]],  // SW
-    [[-1, 0], [0.7, -0.8], [0.7, 0.8]],       // W
-    [[-0.8, -0.8], [0.9, -0.5], [-0.5, 0.9]]  // NW
+  // Unit vectors matching Course.DIRS (N, NE, E, SE, S, SW, W, NW).
+  const D45 = Math.SQRT1_2;
+  const DIR_VEC = [
+    [0, -1], [D45, -D45], [1, 0], [D45, D45], [0, 1], [-D45, D45], [-1, 0], [-D45, -D45]
   ];
+
+  /**
+   * A slope arrow with a shaft and a solid head. A bare triangle reads the same
+   * upside down once it is printed small, which made the direction a guess.
+   */
+  function drawSlopeArrow(d, P, cxp, cyp, cs, dirIdx) {
+    const [ux, uy] = DIR_VEC[dirIdx] || DIR_VEC[0];
+    const L = cs * 0.4;                      // tip distance from centre
+    const nx = -uy, ny = ux;                 // perpendicular
+    const tipX = cxp + ux * L, tipY = cyp + uy * L;
+    const neckX = cxp + ux * L * 0.1, neckY = cyp + uy * L * 0.1;
+    const tailX = cxp - ux * L * 0.85, tailY = cyp - uy * L * 0.85;
+    const hw = cs * 0.17;                    // head half-width
+
+    P.stroke("slope");
+    d.lw(Math.max(0.7, cs * 0.085));
+    d.line(tailX, tailY, neckX, neckY);
+    P.fill("slope");
+    d.poly([[tipX, tipY], [neckX + nx * hw, neckY + ny * hw], [neckX - nx * hw, neckY - ny * hw]]);
+  }
 
   /* Two print palettes. Greys keep the original notebook look and are cheap to
    * print; the colour set matches the on-screen board. */
@@ -106,8 +121,7 @@
         }
       } else if (c.t === T.WATER) { P.fill("waterDot"); d.circle(px, py, cs * 0.09); }
       else if (c.slope >= 0) {
-        P.fill("slope");
-        d.poly(SLOPE_PTS[c.slope].map(p => [px + p[0] * cs * 0.3, py + p[1] * cs * 0.3]));
+        drawSlopeArrow(d, P, px, py, cs, c.slope);
       } else { P.fill(c.t === T.FAIR ? "fairDot" : "roughDot"); d.circle(px, py, cs * 0.07); }
     }
     // tee & cup on top
@@ -204,7 +218,7 @@
       ["sand",  "Sand",     "Hit from here: go 1 dot shorter."],
       ["water", "Water",    "You may fly over it. You may never land in it."],
       ["tree",  "Trees",    "Blocked - unless you are hitting from the fairway."],
-      ["slope", "Slope",    "Land here and roll 1 more dot the way the arrow points."],
+      ["slope", "Slope",    "The arrow head shows which way it rolls your ball 1 extra dot."],
       ["tee",   "Tee",      "Where the hole starts."],
       ["cup",   "Cup",      "Land on it, or stop one dot past, to sink the ball."],
       ["foot",  "Bigfoot",  "He hides in some courses. Finding him earns a mulligan."]
@@ -221,7 +235,7 @@
       if (kind === "tree")  { KP.fill("tree");
                               d.poly([[cx - 7, cy + 7], [cx, cy - 8], [cx + 7, cy + 7]]);
                               KP.fill("trunk"); d.rect(cx - 1.2, cy + 10, 2.4, 3); }
-      if (kind === "slope") { KP.fill("slope"); d.poly([[cx, cy - 7], [cx + 5, cy + 5], [cx, cy + 2], [cx - 5, cy + 5]]); }
+      if (kind === "slope") drawSlopeArrow(d, KP, cx, cy, 26, 3);   // SE, so the angle is obvious
       if (kind === "tee")   { d.strokeG(0.05); d.lw(2); d.circle(cx, cy, 6, "S"); }
       if (kind === "cup")   { d.fillG(0.05); d.circle(cx, cy, 6); }
       if (kind === "foot")  { d.fillG(0.2); d.circle(cx - 3.5, cy + 2, 2.6); d.circle(cx + 3.5, cy - 1, 2.6); }

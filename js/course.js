@@ -68,6 +68,38 @@
     return false;
   }
 
+  /** Shortest 8-way step count avoiding trees/water, or Infinity. */
+  function bfsDist(g, from, to) {
+    const dist = new Int16Array(g.cols * g.rows).fill(-1);
+    let q = [from];
+    dist[from.y * g.cols + from.x] = 0;
+    while (q.length) {
+      const nq = [];
+      for (const p of q) {
+        const d0 = dist[p.y * g.cols + p.x];
+        if (p.x === to.x && p.y === to.y) return d0;
+        for (const d of DIRS) {
+          const nx = p.x + d.x, ny = p.y + d.y;
+          if (!inB(g, nx, ny) || dist[ny * g.cols + nx] >= 0) continue;
+          const t = cell(g, nx, ny).t;
+          if (t === T.TREE || t === T.WATER) continue;
+          dist[ny * g.cols + nx] = d0 + 1;
+          nq.push({ x: nx, y: ny });
+        }
+      }
+      q = nq;
+    }
+    return Infinity;
+  }
+
+  const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+
+  /** True when the cup sits on one of the 8 rays out of the tee. */
+  function onRay(a, b) {
+    const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
+    return dx === 0 || dy === 0 || dx === dy;
+  }
+
   function genHoleAttempt(seed, holeIdx, size, salt) {
     const rng = rngFor(seed + "|h" + holeIdx + "|s" + salt);
     const { cols, rows } = SIZES[size];
@@ -77,6 +109,16 @@
     const flip = rng() < 0.5;
     const tee = { x: ri(rng, 2, cols - 3), y: flip ? ri(rng, 1, 3) : rows - 1 - ri(rng, 1, 3) };
     const hole = { x: ri(rng, 2, cols - 3), y: flip ? rows - 1 - ri(rng, 1, 3) : ri(rng, 1, 3) };
+
+    // A hole you can finish by firing along one straight ray is no fun, so nudge
+    // the cup sideways until it is off every one of the 8 lines out of the tee.
+    let guard = 0;
+    while (onRay(tee, hole) && guard++ < 24) {
+      hole.x += rng() < 0.5 ? -1 : 1;
+      hole.x = Math.max(2, Math.min(cols - 3, hole.x));
+      if (guard > 12) hole.y += (flip ? -1 : 1);   // last resort: shift lengthwise
+      hole.y = Math.max(1, Math.min(rows - 2, hole.y));
+    }
     g.tee = tee; g.hole = hole;
 
     const guardTeeHole = (x, y) => near(tee, x, y, 1) || near(hole, x, y, 1);
@@ -96,8 +138,15 @@
       path.push({ x: px, y: py });
     }
 
+    // Feature counts scale with board area -- the XL grid is 67% larger than the
+    // pocket one, so fixed counts left multiplayer boards looking half empty.
+    // Slightly super-linear: counts alone did not keep pace because blob sizes
+    // are fixed, so a bigger board still read as sparser.
+    const K = Math.pow((cols * rows) / 280, 1.25);
+    const scale = n => Math.max(1, Math.round(n * K));
+
     // Fairway islands along the line + the green around the cup.
-    const nFair = ri(rng, 2, 4);
+    const nFair = scale(ri(rng, 2, 4));
     for (let i = 0; i < nFair; i++) {
       const p = pick(rng, path.length ? path : [tee]);
       stampBlob(g, rng, p.x, p.y, ri(rng, 1, 3), T.FAIR, guardTight);
@@ -105,19 +154,19 @@
     stampBlob(g, rng, hole.x, hole.y, 2, T.FAIR, null);
 
     // Water, sand, trees.
-    const nWater = ri(rng, 0, 2);
+    const nWater = Math.round(ri(rng, 0, 2) * K);
     for (let i = 0; i < nWater; i++)
       stampBlob(g, rng, ri(rng, 2, cols - 3), ri(rng, 2, rows - 3), ri(rng, 1, 2), T.WATER, guardTeeHole);
 
-    const nSand = ri(rng, 1, 3);
+    const nSand = scale(ri(rng, 1, 3));
     for (let i = 0; i < nSand; i++)
       stampBlob(g, rng, ri(rng, 1, cols - 2), ri(rng, 1, rows - 2), ri(rng, 1, 2), T.SAND, guardTeeHole);
 
-    const nClust = ri(rng, 3, 5);
+    const nClust = scale(ri(rng, 3, 5));
     for (let i = 0; i < nClust; i++) {
       const kind = rng() < 0.6 ? 1 : 2; // 1 pine, 2 round
       let cx = ri(rng, 1, cols - 2), cy = ri(rng, 1, rows - 2);
-      const n = ri(rng, 3, 9);
+      const n = ri(rng, 3, 9) + (K > 1.3 ? 3 : 0);
       for (let k = 0; k < n; k++) {
         if (inB(g, cx, cy) && !guardTeeHole(cx, cy)) {
           const c = cell(g, cx, cy);
@@ -127,13 +176,68 @@
       }
     }
 
-    // Slopes on open ground.
-    const nSlope = ri(rng, 1, 4);
-    for (let i = 0; i < nSlope; i++) {
-      const x = ri(rng, 1, cols - 2), y = ri(rng, 1, rows - 2);
-      if (guardTeeHole(x, y)) continue;
-      const c = cell(g, x, y);
-      if (c.t === T.ROUGH || c.t === T.FAIR) c.slope = ri(rng, 0, 7);
+    // A deliberate obstacle across the middle of the route, so the hole bends
+    // instead of running clean from tee to cup.
+    if (rng() < 0.75 && path.length > 4) {
+      const mid = path[Math.floor(path.length * (0.38 + rng() * 0.3))];
+      const kind = rng() < 0.65 ? T.TREE : T.WATER;
+      const r = ri(rng, 1, 2);
+      if (kind === T.WATER) stampBlob(g, rng, mid.x, mid.y, r, T.WATER, guardTeeHole);
+      else for (let y = mid.y - r; y <= mid.y + r; y++)
+        for (let x = mid.x - r; x <= mid.x + r; x++) {
+          if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
+          const c = cell(g, x, y);
+          if (c.t === T.ROUGH || c.t === T.FAIR) { c.t = T.TREE; c.tree = rng() < 0.6 ? 1 : 2; c.slope = -1; }
+        }
+    }
+
+    /* ---- slopes ----
+     * Two things made the old slopes pointless: they were scattered anywhere on
+     * the board (so the ball rarely landed on one), and their direction was
+     * random (so it often pointed into water or a tree, which the rules say
+     * cancels the roll entirely). Now they sit within a couple of dots of the
+     * route the ball actually travels, and every one is guaranteed to push the
+     * ball onto open ground.
+     */
+    const nSlope = scale(ri(rng, 4, 7));
+    const cand = [];
+    const seenCand = new Uint8Array(cols * rows);
+    for (const pt of path) {
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = pt.x + dx, y = pt.y + dy;
+        if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
+        const k = y * cols + x;
+        if (seenCand[k]) continue;
+        const c = cell(g, x, y);
+        if (c.t !== T.ROUGH && c.t !== T.FAIR) continue;
+        seenCand[k] = 1;
+        cand.push({ x, y });
+      }
+    }
+    // deterministic shuffle
+    for (let i = cand.length - 1; i > 0; i--) {
+      const j = (rng() * (i + 1)) | 0;
+      const t2 = cand[i]; cand[i] = cand[j]; cand[j] = t2;
+    }
+
+    let placed = 0;
+    for (const pt of cand) {
+      if (placed >= nSlope) break;
+      const c = cell(g, pt.x, pt.y);
+      if (c.slope >= 0) continue;
+      // only directions that actually move the ball somewhere playable
+      const usable = [];
+      for (let d = 0; d < 8; d++) {
+        const nx = pt.x + DIRS[d].x, ny = pt.y + DIRS[d].y;
+        if (!inB(g, nx, ny)) continue;
+        const nt = cell(g, nx, ny).t;
+        if (nt === T.WATER || nt === T.TREE) continue;   // rules cancel the roll
+        if (nx === hole.x && ny === hole.y) continue;    // don't gift the cup
+        usable.push(d);
+      }
+      if (!usable.length) continue;
+      c.slope = pick(rng, usable);
+      placed++;
     }
 
     // Keep the cup and tee themselves clean.
@@ -142,11 +246,16 @@
     if (tc.t === T.TREE || tc.t === T.WATER) tc.t = T.ROUGH;
     tc.slope = -1;
 
-    return reachable(g, tee, hole) ? g : null;
+    if (!reachable(g, tee, hole)) return null;
+    if (onRay(tee, hole)) return null;
+    // The walk must be at least a little longer than the crow-flies distance,
+    // which means something is genuinely in the way.
+    if (bfsDist(g, tee, hole) < cheb(tee, hole) + 1) return null;
+    return g;
   }
 
   function genHole(seed, holeIdx, size) {
-    for (let salt = 0; salt < 40; salt++) {
+    for (let salt = 0; salt < 200; salt++) {
       const g = genHoleAttempt(seed, holeIdx, size, salt);
       if (g) return g;
     }
