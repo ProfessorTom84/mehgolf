@@ -51,14 +51,90 @@
     s.start(t); s.stop(t + dur + 0.05);
   }
 
+  /** Short pitch-swept tone — the body of a struck-object sound. */
+  function thump(f0, f1, dur, type, vol, when) {
+    if (!ensure() || muted) return;
+    const t = ctx.currentTime + (when || 0);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.002);   // near-instant attack
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  /** Filtered noise burst with a falling cutoff — the "crack" of an impact. */
+  function crack(band0, band1, dur, vol, when, q) {
+    if (!ensure() || muted) return;
+    const t = ctx.currentTime + (when || 0);
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf(dur);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass"; f.Q.value = q || 1.2;
+    f.frequency.setValueAtTime(band0, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(80, band1), t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
   const SFX = {
-    /** wooden clack of the die hitting the page */
-    diceTick(when) { noise(0.05, 2200, 0.35, when); blip(190 + Math.random() * 60, 0.05, "square", 0.12, when); },
-    /** ball struck */
-    hit() { noise(0.06, 1400, 0.3); blip(150, 0.1, "sine", 0.5); },
-    putt() { noise(0.04, 1000, 0.18); blip(210, 0.07, "sine", 0.28); },
+    /**
+     * A die tumbling on paper. Every clatter is a fresh roll of pitch,
+     * brightness, length and level, so no two touchdowns sound alike -- and a
+     * heavier landing (force 0..1) sounds heavier.
+     */
+    diceTick(when, force) {
+      const f = force == null ? rnd(0.5, 1) : force;
+      const dur = rnd(0.028, 0.06);
+      crack(rnd(1700, 3400), rnd(500, 1100), dur, 0.16 + f * 0.24, when, rnd(0.8, 2.2));
+      thump(rnd(150, 320), rnd(70, 130), dur * 1.5, "triangle", 0.05 + f * 0.11, when);
+      if (Math.random() < 0.45) {                       // occasional second edge
+        crack(rnd(2200, 4200), rnd(700, 1400), rnd(0.012, 0.026), 0.06 + f * 0.09,
+              (when || 0) + rnd(0.012, 0.03), 2.4);
+      }
+    },
+
+    /**
+     * Club on ball. A real strike is a very fast, bright crack with almost no
+     * sustain -- a tiny transient, a metallic ping that falls away instantly,
+     * and a soft low thud for the body of the ball.
+     */
+    hit(club) {
+      const heavy = club === "driver" || club == null;
+      const v = heavy ? 1 : 0.8;
+      crack(rnd(4200, 6200), rnd(900, 1500), 0.022, 0.34 * v, 0, 0.9);   // the crack
+      thump(rnd(1500, 2100), rnd(300, 460), 0.05, "triangle", 0.2 * v, 0.001); // metallic ping
+      thump(rnd(120, 175), rnd(55, 80), heavy ? 0.16 : 0.11, "sine", 0.36 * v, 0.002); // body
+      crack(rnd(700, 1000), 200, 0.07, 0.09 * v, 0.004, 0.7);            // air
+    },
+
+    /** Putter: softer, duller, no ping. */
+    putt() {
+      crack(rnd(1800, 2600), rnd(500, 800), 0.018, 0.16, 0, 1.1);
+      thump(rnd(210, 280), rnd(90, 130), 0.09, "sine", 0.22, 0.001);
+    },
+
+    /** Iron: between the two, with a shorter ring. */
+    iron() {
+      crack(rnd(3200, 4600), rnd(800, 1200), 0.02, 0.26, 0, 1.0);
+      thump(rnd(1100, 1500), rnd(280, 400), 0.04, "triangle", 0.14, 0.001);
+      thump(rnd(150, 200), rnd(70, 95), 0.12, "sine", 0.3, 0.002);
+    },
     /** rolling down a slope */
-    slope() { for (let i = 0; i < 4; i++) noise(0.03, 900 - i * 120, 0.14, i * 0.07); },
+    slope() {
+      const n = 3 + ((Math.random() * 3) | 0);
+      for (let i = 0; i < n; i++) {
+        crack(rnd(900, 1500) - i * 90, rnd(300, 500), rnd(0.02, 0.04), rnd(0.07, 0.14), i * rnd(0.05, 0.09), 1.4);
+      }
+    },
     /** ball drops in the cup */
     sink() {
       blip(660, 0.12, "triangle", 0.35, 0);

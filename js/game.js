@@ -680,7 +680,10 @@
     $("#aim").innerHTML = ""; $("#preview").innerHTML = "";
     const p = P();
     p.strokes++;
-    (kind === "putt" ? SFX.putt : SFX.hit)();
+    // each club has its own strike
+    if (kind === "putt") SFX.putt();
+    else if (kind === "iron") SFX.iron();
+    else SFX.hit(kind === "driver" ? "driver" : "swing");
     const from = { ...p.pos };
     logShot(p, kind, from, r);
     animateSegment(from, r.land, kind, p.color, () => {
@@ -1268,6 +1271,9 @@
     T_(svg, hx + 200, hy + 26, 15, 400, "#5b5e57", "\u00B7  " + S.course.name);
     T_(svg, hx, hy + 50, 15, 700, "#24262B", `HOLE ${S.holeIdx + 1} OF 18`);
     T_(svg, hx + 150, hy + 50, 13, 400, "#6a6d64", "Par 6");
+    const blurb = window.Course.courseBlurb(S.seed);
+    const per = Math.floor((W - PAD * 2 - 210) / 5.4);
+    T_(svg, hx, hy + 68, 10, 400, "#8a8d84", blurb.length > per ? blurb.slice(0, per - 1) + "\u2026" : blurb);
 
     // seed badge, right aligned
     const badgeW = 190, badgeX = W - PAD - badgeW;
@@ -1571,6 +1577,15 @@
     }
   }
 
+  /** Show the made-up history of whatever course code is currently typed in. */
+  function refreshBlurb() {
+    const box = $("#course-blurb"), inp = $("#seed-input");
+    if (!box || !inp) return;
+    const code = inp.value.replace(/[^0-9]/g, "").slice(0, 10);
+    if (!code) { box.textContent = ""; return; }
+    box.textContent = `${window.Course.courseName(code)} \u2014 ${window.Course.courseBlurb(code)}`;
+  }
+
   /* ---------------- menu / boot ---------------- */
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
@@ -1605,6 +1620,7 @@
       scores: Array(18).fill(null)
     }));
     $("#course-name").textContent = S.course.name;
+    $("#course-name").title = window.Course.courseBlurb(S.seed);
     $("#seed-chip").textContent = S.seed;
     $("#menu").classList.add("hidden");
     $("#game").classList.remove("hidden");
@@ -1620,7 +1636,7 @@
   function wireMenu() {
     $("#seed-input").value = RNG.randSeedCode();
     $("#shuffle-seed").addEventListener("click", () => {
-      $("#seed-input").value = RNG.randSeedCode();
+      $("#seed-input").value = RNG.randSeedCode(); refreshBlurb();
       SFX.diceTick();
     });
     $("#player-picker").addEventListener("click", e => {
@@ -1661,6 +1677,8 @@
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
     $("#save-btn").addEventListener("click", downloadBoardImage);
+    $("#seed-input").addEventListener("input", refreshBlurb);
+    refreshBlurb();
 
     $("#theme-picker").addEventListener("click", e => {
       const b = e.target.closest("button");

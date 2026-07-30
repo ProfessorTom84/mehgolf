@@ -123,6 +123,10 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 .field label{display:block; font-weight:700; text-transform:uppercase; font-size:.72rem; letter-spacing:.14em; margin-bottom:.25rem}
 .hint{margin:.2rem 0 0; font-size:.72rem; color:#6a6d64}
+.course-blurb{
+  margin:.35rem 0 0; font-size:.72rem; line-height:1.4; font-style:italic;
+  color:#5b5e57; border-left:2px solid var(--graphite); padding-left:.5rem; min-height:2.6em;
+}
 .seed-row{display:flex; gap:.5rem}
 .seed-row input, .seed-row select{
   flex:1; font-family:inherit; font-size:.92rem; padding:.38rem .6rem;

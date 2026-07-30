@@ -22,6 +22,73 @@
     return pick(r, NAME_A) + " " + pick(r, NAME_B);
   }
 
+  /* A one-line history for a course that has never existed. Built from three
+   * seeded fragments so the same code always tells the same story. */
+  const BLURB_A = [
+    "Laid out in 1931 by a man who had never played golf",
+    "Built on the site of a failed sheep farm",
+    "Designed over one long weekend and never revised",
+    "Carved out of a wood that the locals still avoid",
+    "Founded by two brothers who stopped speaking during construction",
+    "Originally a racecourse, briefly",
+    "Drawn up on the back of a menu and honoured ever since",
+    "Opened to great excitement and immediately forgotten",
+    "Planned by committee, which explains a great deal",
+    "Built downhill from a reservoir, optimistically",
+    "Established the year the river changed its mind",
+    "Converted from an orchard nobody wanted",
+    "Set out by a retired postman with a very long stride",
+    "Reclaimed from marsh that has been quietly reclaiming it back",
+    "Inherited, unwillingly, by the current owner",
+    "Started as nine holes and doubled by accident",
+    "Mapped by a surveyor who was, by his own admission, lost",
+    "Occupies land three separate councils have disowned",
+    "Assembled from two smaller courses that never got along",
+    "Named after a horse"
+  ];
+  const BLURB_B = [
+    "Famous for its stubborn bunkers",
+    "Known chiefly for the wind",
+    "Notable for having more water than the map suggests",
+    "Remembered for one enormous tree",
+    "Celebrated locally, tolerated regionally",
+    "Best known for a green nobody can hold",
+    "Respected for its fairways and feared for everything else",
+    "Talked about mostly in the past tense",
+    "Popular with people who enjoy walking",
+    "Beloved by exactly the sort of person who would love it",
+    "Renowned for a slope that has ended several friendships",
+    "Distinguished by hedges of unusual determination",
+    "Noted for excellent drainage in the wrong places",
+    "Praised for its scenery by those not keeping score",
+    "Recognised for a par nobody has verified",
+    "Known for the quiet, which is not entirely natural"
+  ];
+  const BLURB_C = [
+    "Bring a pencil and low expectations.",
+    "The scorecard is a work of fiction by the third hole.",
+    "Play it twice; the second round makes more sense.",
+    "The members insist it is fair. The members are wrong.",
+    "Nothing here is as far away as it looks.",
+    "It rewards patience and punishes almost everything else.",
+    "Locals recommend aiming somewhere else entirely.",
+    "It has never once played the same way twice.",
+    "Do not trust the flat bits.",
+    "Every hole has a shortcut and every shortcut is a trap.",
+    "The trees are closer together than they appear.",
+    "It is a kind course, provided you keep your ambitions modest.",
+    "Two hours of quiet walking, interrupted by golf.",
+    "The bunkers are deeper than the architect intended.",
+    "Somewhere out there is a par. Nobody has produced one yet.",
+    "Wear sensible shoes and bring a spare ball."
+  ];
+
+  /** Seeded one-line description for a course. */
+  function courseBlurb(seed) {
+    const r = rngFor(seed + "|blurb");
+    return `${pick(r, BLURB_A)}. ${pick(r, BLURB_B)}. ${pick(r, BLURB_C)}`;
+  }
+
   function inB(g, x, y) { return x >= 0 && y >= 0 && x < g.cols && y < g.rows; }
   function cell(g, x, y) { return g.cells[y * g.cols + x]; }
 
@@ -106,9 +173,44 @@
     const g = blank(cols, rows);
 
     // Tee near one end, cup near the other; flip half the time so play alternates up/down.
+    /* ---- how long is this hole? ----
+     * Tee and cup used to sit at opposite ends of the page every single time,
+     * which made every hole the same length. A round should breathe: a couple of
+     * short ones you can genuinely attack, a majority of mid-length holes, and a
+     * few long hauls. Par stays 6 throughout, so the short holes become birdie
+     * chances and the long ones are where rounds are lost.
+     */
+    const span = Math.max(cols, rows) - 3;
+    const lenRoll = rng();
+    const cls = lenRoll < 0.24 ? "short" : lenRoll < 0.76 ? "mid" : "long";
+    const wantRaw = cls === "short" ? span * (0.46 + rng() * 0.12)
+      : cls === "mid" ? span * (0.62 + rng() * 0.18)
+        : span * (0.88 + rng() * 0.12);
+    // never so short that a hole is over before it starts
+    const want = Math.max(8, Math.round(wantRaw));
+    g.length = cls;
+
     const flip = rng() < 0.5;
-    const tee = { x: ri(rng, 2, cols - 3), y: flip ? ri(rng, 1, 3) : rows - 1 - ri(rng, 1, 3) };
     const hole = { x: ri(rng, 2, cols - 3), y: flip ? rows - 1 - ri(rng, 1, 3) : ri(rng, 1, 3) };
+
+    // Put the tee at roughly the wanted distance from the cup, trying a spread
+    // of bearings and keeping the best fit that stays on the page.
+    let tee = null, bestErr = 1e9;
+    for (let a = 0; a < 40; a++) {
+      const ang = rng() * Math.PI * 2;
+      const tx = Math.round(hole.x + Math.cos(ang) * want);
+      const ty = Math.round(hole.y + Math.sin(ang) * want);
+      if (tx < 2 || ty < 1 || tx > cols - 3 || ty > rows - 2) continue;
+      const d = Math.max(Math.abs(tx - hole.x), Math.abs(ty - hole.y));
+      const err = Math.abs(d - want);
+      if (err < bestErr) { bestErr = err; tee = { x: tx, y: ty }; }
+      if (err === 0) break;
+    }
+    // If no bearing fitted (common for the long ones), fall back to the far end
+    // of the page, which is the longest the board allows.
+    if (!tee || bestErr > 3) {
+      tee = { x: ri(rng, 2, cols - 3), y: hole.y < rows / 2 ? rows - 1 - ri(rng, 1, 3) : ri(rng, 1, 3) };
+    }
 
     // A hole you can finish by firing along one straight ray is no fun, so nudge
     // the cup sideways until it is off every one of the 8 lines out of the tee.
@@ -118,6 +220,15 @@
       hole.x = Math.max(2, Math.min(cols - 3, hole.x));
       if (guard > 12) hole.y += (flip ? -1 : 1);   // last resort: shift lengthwise
       hole.y = Math.max(1, Math.min(rows - 2, hole.y));
+    }
+    // Final guard: the nudge above can pull the cup closer, and a 4-dot hole is
+    // over before it begins.
+    if (Math.max(Math.abs(tee.x - hole.x), Math.abs(tee.y - hole.y)) < 7) {
+      tee.y = hole.y < rows / 2 ? rows - 1 - ri(rng, 1, 3) : ri(rng, 1, 3);
+      let g2 = 0;
+      while (onRay(tee, hole) && g2++ < 12) {
+        tee.x = Math.max(2, Math.min(cols - 3, tee.x + (rng() < 0.5 ? -1 : 1)));
+      }
     }
     g.tee = tee; g.hole = hole;
 
@@ -369,5 +480,5 @@
     return { seed, size, name: courseName(seed), holes, bigfoot };
   }
 
-  global.Course = { T, DIRS, SIZES, genCourse, genHole, courseName, cell, inB };
+  global.Course = { T, DIRS, SIZES, genCourse, genHole, courseName, courseBlurb, cell, inB };
 })(window);

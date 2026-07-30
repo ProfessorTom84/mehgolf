@@ -85,6 +85,8 @@
     fairDot: [0.62], roughDot: [0.72], waterDot: [1]
 ,
     mound: [0.3], hollow: [0.45]
+,
+    ink: [0.05]
   };
   const COLOUR = {
     fair: [0.81, 0.89, 0.68], water: [0.50, 0.71, 0.86],
@@ -93,6 +95,8 @@
     slope: [0.54, 0.48, 0.71],
     fairDot: [0.50, 0.63, 0.36], roughDot: [0.71, 0.75, 0.64], waterDot: [0.86, 0.93, 0.97],
     mound: [0.77, 0.44, 0.23], hollow: [0.36, 0.50, 0.75]
+,
+    ink: [0.05]
   };
 
   function painter(d, colour) {
@@ -170,25 +174,31 @@
     d.fillG(0.94); d.rect(M - 14, 30, PW - (M - 14) * 2, 74);
     d.fillG(0.05);
     d.text(M, 62, 30, "MEH GOLF", true);
-    d.text(M, 84, 12, "Eighteen holes of pencil-and-paper golf. All you need is a die.");
+    d.text(M, 84, 12, "Eighteen holes. One die. A pencil, and nobody watching.");
     d.strokeG(0.05); d.lw(2); d.line(M - 14, 104, PW - M + 14, 104);
 
     d.text(M, 124, 11, "Course: " + course.name + "        Course code: " + course.seed, true);
     d.fillG(0.35);
     d.text(M, 138, 9, "Type that code into the game to play these exact holes on screen.");
+    // the course's invented history, wrapped under the header
+    d.fillG(0.42);
+    let by = 154;
+    wrap(window.Course.courseBlurb(course.seed), 9, PW - M * 2).forEach(ln => {
+      d.text(M, by, 9, ln); by += 11;
+    });
 
     /* ---------------- left column: how to play ---------------- */
-    let y = 168;
+    let y = 186;
     d.fillG(0.05);
     d.text(L, y, 15, "HOW TO PLAY", true); y += 8;
     d.strokeG(0.05); d.lw(1.2); d.line(L, y, L + colW, y); y += 18;
 
     const steps = [
-      ["1. Start at the tee.", "The little circle is where your ball begins. The solid dot is the cup. Get from one to the other in as few shots as you can."],
-      ["2. Roll the die.", "The number you roll is how many dots your ball travels. Roll a 4, move 4 dots."],
-      ["3. Pick a direction.", "Straight up, down, left, right, or any diagonal - eight choices. The ball travels in a straight line and stops."],
-      ["4. Mark it down.", "Draw a line from where the ball was to where it landed. Add one stroke to your score."],
-      ["5. Sink it.", "Land exactly on the cup and you are in. If your line goes over the cup and stops just one dot past, that counts too!"]
+      ["1. Find your ball.", "The hollow circle is where you start. The solid dot is the cup. Everything else is in the way."],
+      ["2. Roll the die.", "Whatever comes up is how many dots the ball travels. Roll a 4, move 4 dots. No arguing with it."],
+      ["3. Choose your line.", "Up, down, sideways or any diagonal - eight to pick from. The ball runs straight and stops where it runs out."],
+      ["4. Draw it in.", "Rule a line from where the ball was to where it ended up, and add a stroke. The page is the scorecard."],
+      ["5. Get it in the cup.", "Land right on the cup and you are done. Skid one dot past it and that counts too - call it rattling in off the back."]
     ];
     steps.forEach(([head, body]) => {
       d.fillG(0.05);
@@ -200,13 +210,13 @@
 
     y += 4;
     d.fillG(0.05);
-    d.text(L, y, 12, "THE THREE RULES THAT MATTER", true); y += 8;
+    d.text(L, y, 12, "THE RULES THAT ACTUALLY MATTER", true); y += 8;
     d.strokeG(0.05); d.line(L, y, L + colW, y); y += 16;
     const rules = [
-      "Fairway is friendly. Hit from the big open patches and your ball goes 1 dot FURTHER, and it flies right over trees.",
-      "Sand is grumpy. Hit from a striped patch and your ball goes 1 dot SHORTER.",
+      "The fairway is on your side. Swing from the big open patches and the ball runs 1 dot FURTHER, and sails clean over any trees in the way.",
+      "Sand is not on your side. Swing out of a striped patch and the ball goes 1 dot SHORTER. Just get out.",
       "Hills move your ball. Land on a dot with an arrow and follow it one more dot. Solid arrows are a MOUND and push you away from the middle of the block; open arrows are a HOLLOW and pull you toward it. If you land on another arrow, keep going!",
-      "You get do-overs. Your first shot on each hole can be re-rolled once for free. You also get 6 mulligans for the whole round - use one any time you hate your roll."
+      "You get second chances. The first shot of every hole can be re-rolled once, free. After that you have 6 mulligans for the whole round - spend one whenever the die insults you."
     ];
     rules.forEach(r => {
       d.fillG(0.05); d.circle(L + 3, y - 3, 2);
@@ -216,7 +226,7 @@
     });
 
     /* ---------------- right column: map key ---------------- */
-    let ry = 168;
+    let ry = 186;
     d.fillG(0.05);
     d.text(R, ry, 15, "MAP KEY", true); ry += 8;
     d.strokeG(0.05); d.line(R, ry, R + colW, ry); ry += 20;
@@ -268,11 +278,11 @@
     d.fillG(0.05);
     d.text(R + 10, ry + 8, 10.5, "PLAYING WITH FRIENDS?", true);
     d.fillG(0.28);
-    wrap("Everyone tees off in turn. After that, whoever is furthest from the cup shoots next. Lowest total after 18 holes wins.", 8.8, colW - 20)
+    wrap("Everyone tees off in turn. After that, whoever is furthest from the cup goes next. Lowest total after 18 holes gets the bragging rights.", 8.8, colW - 20)
       .forEach((ln, i) => d.text(R + 10, ry + 22 + i * 10, 8.8, ln));
 
     d.fillG(0.4);
-    d.text(M, PH - 34, 9, "Par is 6 on every hole. Have fun, and don't take the sand personally.");
+    d.text(M, PH - 34, 9, "Par is 6 on every hole. Take your time, and try not to take the sand personally.");
     return d.ops.join("\n");
   }
 
@@ -280,6 +290,7 @@
   function buildHolePage(course, hIdx, colour) {
     const d = makeOps();
     const M = 40;
+    const P = painter(d, colour);
     const g = course.holes[hIdx];
 
     // header
@@ -292,7 +303,28 @@
     // big hole number + scorebox on one line under the rule
     d.fillG(0.05);
     d.text(M, 100, 26, "HOLE " + (hIdx + 1), true);
-    d.text(M + 150, 100, 12, "Strokes: ______ / 6      Running total: ______");
+    /* A shared sheet needs room for everyone, and "/ 6" was nonsense -- par is
+     * the target, not a ceiling; plenty of holes take more. Four named boxes
+     * with a running-total column instead. */
+    const boxY = 82, boxH = 26, boxW = 76, gap = 6;
+    const bx0 = M + 118;
+    d.fillG(0.35);
+    d.text(bx0, boxY - 4, 8, "PLAYER  /  STROKES");
+    d.text(bx0 + (boxW + gap) * 4 - 4, boxY - 4, 8, "TOTAL SO FAR");
+    for (let i = 0; i < 4; i++) {
+      const bx = bx0 + i * (boxW + gap);
+      P.stroke("ink"); d.lw(0.8);
+      d.rect(bx, boxY, boxW, boxH, "S");
+      d.fillG(0.55);
+      d.text(bx + 4, boxY + 9, 7, "name");
+      P.stroke("ink"); d.lw(0.5);
+      d.line(bx + 26, boxY + 10, bx + boxW - 4, boxY + 10);   // name rule
+      d.line(bx + 4, boxY + 21, bx + boxW - 4, boxY + 21);    // strokes rule
+    }
+    const tx = bx0 + (boxW + gap) * 4;
+    P.stroke("ink"); d.lw(0.8);
+    d.rect(tx, boxY, 62, boxH, "S");
+    d.fillG(0.05);
 
     // the map gets the whole rest of the page
     const availW = PW - M * 2;

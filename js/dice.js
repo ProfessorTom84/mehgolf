@@ -51,7 +51,8 @@
       const y1 = H * (0.45 + Math.random() * 0.3);
 
       const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const DUR = calm ? 420 : 1600, bounces = calm ? 1 : 3;
+      const DUR = calm ? 420 : 1250 + Math.random() * 750;
+      const bounces = calm ? 1 : 2 + ((Math.random() * 3) | 0);
       const [fx, fy] = FACE_ROT[value];
 
       // The die rotates ONCE, continuously, to an orientation that is exactly
@@ -59,8 +60,10 @@
       // orientation is baked into the very first frame's trajectory, the face
       // that appears as it slows down is the face it lands on — there is no
       // separate "settle" phase that could visibly flip it to another number.
-      const turnsX = (2 + ((Math.random() * 2) | 0)) * (Math.random() < 0.5 ? 1 : -1);
-      const turnsY = (2 + ((Math.random() * 2) | 0)) * (Math.random() < 0.5 ? 1 : -1);
+      // Spin count varies widely so no two throws look alike: sometimes it barely
+      // turns over, sometimes it tumbles half a dozen times.
+      const turnsX = (1 + ((Math.random() * 5) | 0)) * (Math.random() < 0.5 ? 1 : -1);
+      const turnsY = (1 + ((Math.random() * 5) | 0)) * (Math.random() < 0.5 ? 1 : -1);
       const endRX = turnsX * 360 + fx;
       const endRY = turnsY * 360 + fy;
       const hop = calm ? 18 : 90 + Math.random() * 50;
@@ -78,7 +81,10 @@
           // bounce height decays to exactly 0 at t=1 so it comes to rest flat
           const b = Math.abs(Math.sin(t * Math.PI * bounces)) * hop * (1 - t) * (1 - t);
           const phase = Math.floor(t * bounces * 2);
-          if (b < 6 && !ticked.has(phase)) { ticked.add(phase); SFX.diceTick(); }
+          if (b < 6 && !ticked.has(phase)) {
+            ticked.add(phase);
+            SFX.diceTick(0, Math.max(0.25, 1 - t));   // later bounces land softer
+          }
           die.style.transform =
             `translate(${x - 27}px, ${y - 27 - b}px) rotateX(${endRX * e}deg) rotateY(${endRY * e}deg)`;
           shadow.style.transform = `translate(${x - 27}px, ${y + 22}px) scale(${1 - b / 260})`;
@@ -90,7 +96,7 @@
             `translate(${x1 - 27}px, ${y1 - 27}px) rotateX(${endRX}deg) rotateY(${endRY}deg)`;
           shadow.style.transform = `translate(${x1 - 27}px, ${y1 + 22}px) scale(1)`;
           shadow.style.opacity = "0.7";
-          SFX.diceTick();
+          SFX.diceTick(0, 0.3);                        // final settle
           setTimeout(() => {
             die.style.transition = "opacity .35s"; shadow.style.transition = "opacity .35s";
             die.style.opacity = "0"; shadow.style.opacity = "0";
