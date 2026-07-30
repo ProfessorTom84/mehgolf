@@ -236,7 +236,7 @@
     wrap.appendChild(svg);
     svg.dataset.vw = w; svg.dataset.vh = h;
     wireHover(svg);
-    fitBoard(true);
+    fitBoardSettled(true);
     drawTrails(); drawBalls();
   }
 
@@ -358,9 +358,30 @@
     if (svg.style.width === w + "px" && svg.style.height === h + "px") return;
     svg.style.width = w + "px";
     svg.style.height = h + "px";
+
+    // The paper must hug the board. Left to itself the page sizes to its widest
+    // child, and the footer strip grows with the player count -- which is why a
+    // four-player board sat in the top-left of an over-wide sheet.
+    const book = document.querySelector(".notebook");
+    const page = document.querySelector(".page");
+    if (book && page) {
+      const cs = getComputedStyle(page);
+      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      book.style.width = (w + padX) + "px";
+    }
+  }
+
+  /**
+   * Fit, then fit again. Narrowing the page can make the footer strip wrap onto
+   * another line, which changes the height available to the board; a second pass
+   * settles that in the same frame.
+   */
+  function fitBoardSettled(force) {
+    fitBoard(force);
+    fitBoard(true);
   }
   let fitTimer = null;
-  const scheduleFit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitBoard, 80); };
+  const scheduleFit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => fitBoardSettled(false), 80); };
   window.addEventListener("resize", scheduleFit);
   window.addEventListener("orientationchange", scheduleFit);
   // NOTE: deliberately no ResizeObserver here. Observing the layout that
@@ -1330,9 +1351,11 @@
   }
 
   function updateFoot() {
+    const compact = S.ps.length > 2;
     $("#foot-players").innerHTML = S.ps.map(p => {
       const pips = Array.from({ length: 6 }, (_, i) => `<span class="pip${i < Math.min(p.strokes, 6) ? " f" : ""}"></span>`).join("");
-      return `<span class="foot-p" style="color:${p.color}">${p.name} ${pips}${p.strokes > 6 ? "+" + (p.strokes - 6) : ""}</span>`;
+      const label = compact ? `<span class="dotc"></span>` : p.name + " ";
+      return `<span class="foot-p" style="color:${p.color}" title="${p.name}">${label}${pips}${p.strokes > 6 ? "+" + (p.strokes - 6) : ""}</span>`;
     }).join("");
   }
 

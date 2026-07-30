@@ -190,8 +190,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .history-row .h-sunk{color:#1F8A46; font-weight:700}
 
 /* ---------- notebook ---------- */
-.notebook{position:relative; filter:drop-shadow(0 22px 30px rgba(0,0,0,.5)); min-height:0; display:flex; flex-direction:column}
+.notebook{position:relative; min-width:0; filter:drop-shadow(0 22px 30px rgba(0,0,0,.5)); min-height:0; display:flex; flex-direction:column}
 .page{
+  width:100%; min-width:0;
   background:var(--paper);
   border-radius:6px 6px 12px 12px;
   padding:14px 14px 8px;
@@ -201,14 +202,21 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 /* Containing block for the confetti / toast overlays; no layout effect. */
 #board-wrap{position:relative}
 #board-wrap svg{display:block; width:min(62vw, 560px); height:auto; max-width:100%}
+/* Exactly one line, always. If this strip could wrap it would change the height
+   available to the board, and the board's width would change the wrapping --
+   a loop with no stable answer. The pips are protected; the two labels shrink
+   and ellipsis away first. */
 .page-foot{
-  display:flex; gap:1rem; justify-content:space-between; align-items:center;
+  display:flex; gap:.5rem; justify-content:space-between; align-items:center;
   border-top:2px solid var(--ink); margin-top:8px; padding:6px 4px 4px;
-  font-size:.85rem; letter-spacing:.03em; flex-wrap:wrap;
+  font-size:.76rem; letter-spacing:.03em; flex-wrap:nowrap;
+  min-width:0; overflow:hidden; white-space:nowrap;
 }
-#foot-players{display:flex; gap:.9rem; flex-wrap:wrap}
-.foot-p{display:inline-flex; align-items:center; gap:.3rem}
-.foot-p .pip{width:9px; height:9px; border-radius:50%; border:1.5px solid currentColor; display:inline-block}
+#foot-hole, #foot-par{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+#foot-players{display:flex; gap:.5rem; flex-wrap:nowrap; min-width:0; justify-content:center; flex:0 0 auto}
+.foot-p{display:inline-flex; align-items:center; gap:.22rem; white-space:nowrap}
+.foot-p .dotc{width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block}
+.foot-p .pip{width:7.5px; height:7.5px; border-radius:50%; border:1.5px solid currentColor; display:inline-block}
 .foot-p .pip.f{background:currentColor}
 
 /* ---------- board svg ---------- */
