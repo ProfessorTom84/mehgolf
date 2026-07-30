@@ -240,6 +240,51 @@
       placed++;
     }
 
+    /* ---- coverage pass ----
+     * Terrain clusters along the tee-to-cup corridor, which left whole corners
+     * of the board as bare dots and made the playfield look off-centre. Sweep a
+     * coarse zone grid and give anything that reads as dead space something to
+     * look at. Fills are biased toward sand and fairway so they add interest
+     * without often blocking the route.
+     */
+    const ZX = 3, ZY = 4;
+    for (let zy = 0; zy < ZY; zy++) {
+      for (let zx = 0; zx < ZX; zx++) {
+        const zx0 = Math.floor(zx * cols / ZX), zx1 = Math.floor((zx + 1) * cols / ZX);
+        const zy0 = Math.floor(zy * rows / ZY), zy1 = Math.floor((zy + 1) * rows / ZY);
+        let feats = 0, count = 0;
+        for (let y = zy0; y < zy1; y++) for (let x = zx0; x < zx1; x++) {
+          count++;
+          const c = cell(g, x, y);
+          if (c.t !== T.ROUGH || c.slope >= 0) feats++;
+        }
+        if (!count || feats / count >= 0.12) continue;
+
+        const cx0 = Math.max(1, Math.min(cols - 2, ri(rng, zx0 + 1, zx1 - 2)));
+        const cy0 = Math.max(1, Math.min(rows - 2, ri(rng, zy0 + 1, zy1 - 2)));
+        if (guardTeeHole(cx0, cy0)) continue;
+
+        const roll = rng();
+        if (roll < 0.26) {
+          stampBlob(g, rng, cx0, cy0, ri(rng, 1, 2), T.SAND, guardTeeHole);
+        } else if (roll < 0.66) {
+          stampBlob(g, rng, cx0, cy0, ri(rng, 1, 2), T.FAIR, guardTight);
+        } else if (roll < 0.93) {
+          let tx2 = cx0, ty2 = cy0;
+          const n2 = ri(rng, 3, 6), kind2 = rng() < 0.6 ? 1 : 2;
+          for (let k = 0; k < n2; k++) {
+            if (inB(g, tx2, ty2) && !guardTeeHole(tx2, ty2)) {
+              const c = cell(g, tx2, ty2);
+              if (c.t === T.ROUGH || c.t === T.FAIR) { c.t = T.TREE; c.tree = kind2; c.slope = -1; }
+            }
+            tx2 += ri(rng, -1, 1); ty2 += ri(rng, -1, 1);
+          }
+        } else {
+          stampBlob(g, rng, cx0, cy0, 1, T.WATER, guardTeeHole);
+        }
+      }
+    }
+
     // Keep the cup and tee themselves clean.
     cell(g, hole.x, hole.y).t = T.FAIR; cell(g, hole.x, hole.y).slope = -1;
     const tc = cell(g, tee.x, tee.y);
