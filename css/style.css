@@ -172,6 +172,15 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   box-shadow:0 14px 34px rgba(0,0,0,.34); padding:.75rem .85rem;
   display:flex; flex-direction:column; min-height:0; gap:.55rem;
 }
+/* Only the panels that actually scroll get a fade at the foot, hinting that
+   there is more below. The turn panel never scrolls, so it must not be washed
+   out. */
+.history, .legend-panel, .score-panel{position:relative}
+.history::after, .legend-panel::after, .score-panel::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:16px;
+  background:linear-gradient(to top, var(--paper), rgba(250,248,242,0));
+  pointer-events:none; border-radius:0 0 var(--radius) var(--radius);
+}
 .panel-head{
   font-size:.66rem; text-transform:uppercase; letter-spacing:.18em; color:#6a6d64;
   border-bottom:2px solid var(--ink); padding-bottom:.34rem; flex:0 0 auto;
@@ -225,18 +234,39 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ---------- board svg ---------- */
 #board{cursor:default}
+/* ---------- aim targets ----------
+   Deliberately a different shape language from anything on the map: a solid
+   disc in the shooting player's colour with a white chevron. The board is full
+   of arrows already (mounds, hollows, wind), so an outlined triangle reads as
+   terrain rather than as a button. */
 .aim-arrow{cursor:pointer}
 .aim-arrow .hit{fill:transparent}
-.aim-arrow polygon.head{
-  fill:var(--ink); opacity:.5;
-  transition:opacity .12s ease, transform .12s ease;
+.aim-arrow .chip-sh{fill:rgba(0,0,0,.28)}
+.aim-arrow .chip{
+  stroke:var(--paper); stroke-width:2.2;
+  transition:transform .12s ease;
   transform-origin:center; transform-box:fill-box;
 }
+.aim-arrow polygon.head{
+  fill:#fff; transition:transform .12s ease;
+  transform-origin:center; transform-box:fill-box;
+}
+.aim-arrow:hover .chip,
+.aim-arrow:focus-visible .chip{transform:scale(1.22)}
 .aim-arrow:hover polygon.head,
-.aim-arrow:focus-visible polygon.head{opacity:1; transform:scale(1.25)}
+.aim-arrow:focus-visible polygon.head{transform:scale(1.22)}
+.aim-arrow:focus-visible{outline:none}
+.aim-arrow:focus-visible .chip{stroke:var(--ink); stroke-width:2.6}
+
 .aim-arrow.blocked{cursor:not-allowed}
-.aim-arrow.blocked polygon.head{opacity:.12}
-.aim-arrow.blocked:hover polygon.head{opacity:.28; transform:none}
+.aim-arrow.blocked .chip{fill:var(--paper); stroke:var(--graphite); stroke-width:1.6; opacity:.7}
+.aim-arrow.blocked .no1{stroke:var(--graphite); stroke-width:1.8; stroke-linecap:round; opacity:.75}
+.aim-arrow.blocked:hover .chip{opacity:1}
+
+/* While choosing a direction, the map steps back so the controls own the eye. */
+#board.aiming .tree-sway,
+#board.aiming .water-shimmer{opacity:.55; transition:opacity .15s}
+#board.aiming #ambience{opacity:.35}
 .preview-line{pointer-events:none}
 .stroke-line{stroke-linecap:round}
 .ball-current{filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
@@ -319,7 +349,16 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   border-top:5px solid var(--turn, var(--ink));
   box-shadow:0 14px 34px rgba(0,0,0,.34), inset 0 0 0 1px color-mix(in srgb, var(--turn, #000) 22%, transparent);
 }
-.tray.multi .panel-head{color:var(--turn, #6a6d64); border-bottom-color:var(--turn, var(--ink))}
+.tray.multi /* Only the panels that actually scroll get a fade at the foot, hinting that
+   there is more below. The turn panel never scrolls, so it must not be washed
+   out. */
+.history, .legend-panel, .score-panel{position:relative}
+.history::after, .legend-panel::after, .score-panel::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:16px;
+  background:linear-gradient(to top, var(--paper), rgba(250,248,242,0));
+  pointer-events:none; border-radius:0 0 var(--radius) var(--radius);
+}
+.panel-head{color:var(--turn, #6a6d64); border-bottom-color:var(--turn, var(--ink))}
 .turn-chip{
   display:inline-block; margin-left:.5rem; padding:.05rem .45rem; border-radius:999px;
   font-size:.66rem; font-weight:700; color:#fff; letter-spacing:.08em; vertical-align:2px;
@@ -373,6 +412,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   .party{display:none}
   .ball-halo, .turn-toast{animation:none}
 }
+
+#board .terrain-arrow{transition:opacity .15s ease}
+#board.aiming .terrain-arrow{opacity:.34}
 
 /* ---------- board ambience ---------- */
 /* A slow breeze. Rotation only, anchored at each trunk, so nothing reflows and

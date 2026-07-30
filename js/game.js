@@ -194,7 +194,7 @@
         // terrain underneath.
         const isHill = c.hill > 0;
         const col = c.hill === 1 ? TH.mound : c.hill === 2 ? TH.hollow : TH.slope;
-        const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .95 }, feat);
+        const a = el("g", { class: "terrain-arrow", transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .95 }, feat);
         el("line", {
           x1: 0, y1: 8, x2: 0, y2: -2,
           stroke: col, "stroke-width": isHill ? 3.2 : 3, "stroke-linecap": "round"
@@ -521,6 +521,8 @@
   /* ---------------- aim UI ---------------- */
   function showAim(n, kind) {
     const aim = $("#aim"); aim.innerHTML = "";
+    const bd = document.getElementById("board");
+    if (bd) bd.classList.add("aiming");
     $("#preview").innerHTML = "";
     const p = P();
     const results = legalDirs(p.pos, n, kind);
@@ -535,8 +537,21 @@
         tabindex: r.ok ? 0 : -1, role: "button",
         "aria-label": r.ok ? "hit " + n : (r.reason || "blocked")
       }, aim);
-      el("circle", { class: "hit", cx: 0, cy: 0, r: 15 }, grp); // generous click/tap target
-      el("polygon", { class: "head", points: "0,-11 8,7 0,3 -8,7" }, grp);
+      /* These have to be obviously CONTROLS, not map symbols. The board is
+       * already full of arrows -- mounds, hollows, wind -- so a plain triangle
+       * reads as terrain. Each aim target is a solid disc in the player's own
+       * colour with a white chevron inside: a different shape language, tied to
+       * whoever is shooting, and legible on any terrain underneath. */
+      el("circle", { class: "hit", cx: 0, cy: 0, r: 17 }, grp);   // generous click/tap target
+      if (r.ok) {
+        el("circle", { class: "chip-sh", cx: 0, cy: 1.5, r: 11 }, grp);          // drop shadow
+        el("circle", { class: "chip", cx: 0, cy: 0, r: 11, fill: p.color }, grp);
+        el("polygon", { class: "head", points: "0,-5.5 4.6,2.4 0,0.4 -4.6,2.4" }, grp);
+      } else {
+        el("circle", { class: "chip blocked-chip", cx: 0, cy: 0, r: 9 }, grp);
+        el("line", { class: "no1", x1: -4, y1: -4, x2: 4, y2: 4 }, grp);
+        el("line", { class: "no1", x1: 4, y1: -4, x2: -4, y2: 4 }, grp);
+      }
       el("title", {}, grp).textContent = r.ok ? `Hit ${n} this way` : (r.reason || "blocked");
       if (r.ok) {
         any = true;
@@ -678,6 +693,8 @@
     if (S.phase !== "aim") return;
     S.phase = "anim";
     $("#aim").innerHTML = ""; $("#preview").innerHTML = "";
+    const bdc = document.getElementById("board");
+    if (bdc) bdc.classList.remove("aiming");
     const p = P();
     p.strokes++;
     // each club has its own strike
