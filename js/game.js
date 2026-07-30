@@ -38,7 +38,7 @@
       paper: "#FAF8F2", fairway: "#E4E2DA", water: "#969C9F",
       sand: "#F0E8D2", sandHatch: "#D9CBA4",
       tree: "#3A3F3A", treeAlt: "#3A3F3A", trunk: "#3A3F3A",
-      slope: "#6B6F66", hillUp: "#EDEBE1", hillDown: "#DCD9CC", green: "#DAD8CE",
+      slope: "#6B6F66", mound: "#5F6355", hollow: "#6B6F66", green: "#DAD8CE",
       roughDot: "#C6C2B8", fairwayDot: "#A8A59A", sandDot: "#CBBD97", waterDot: "#EDEFEF",
       tee: "#24262B", cup: "#24262B", bigfoot: "#3A3F3A",
       boost: "#5A5F58", penalty: "#8A8272"
@@ -47,7 +47,7 @@
       paper: "#FAF8F2", fairway: "#CFE3AE", water: "#7FB6DC",
       sand: "#F6E7B2", sandHatch: "#E0C77E",
       tree: "#2F6B3A", treeAlt: "#3E7C46", trunk: "#6B4E31",
-      slope: "#8A7BB5", hillUp: "#EFE8F4", hillDown: "#DED4EA", green: "#B4D98C",
+      slope: "#8A7BB5", mound: "#C4703A", hollow: "#5B7FBF", green: "#B4D98C",
       roughDot: "#B6BFA4", fairwayDot: "#7FA05C", sandDot: "#C9A94F", waterDot: "#DCEEF8",
       tee: "#24262B", cup: "#24262B", bigfoot: "#4A3F35",
       boost: "#1F8A46", penalty: "#C08528"
@@ -161,34 +161,7 @@
 
     const terr = el("g", {}, svg);
     const dots = el("g", {}, svg);
-    // Hill footprints sit under the features so arrows and trees stay legible.
-    const hills = el("g", {}, svg);
     const feat = el("g", {}, svg);
-    (G.hills || []).forEach(h => {
-      const cxh = px(h.x), cyh = px(h.y), rad = (h.r + 0.45) * C;
-      const up = h.kind === "mound";
-      el("circle", {
-        cx: cxh, cy: cyh, r: rad,
-        fill: up ? TH.hillUp : TH.hillDown, opacity: up ? .85 : .9
-      }, hills);
-      // contour ring: solid for a mound, dashed for a hollow
-      el("circle", {
-        cx: cxh, cy: cyh, r: rad - 3, fill: "none",
-        stroke: TH.slope, "stroke-width": 1.6, opacity: .5,
-        "stroke-dasharray": up ? "none" : "5 4"
-      }, hills);
-      if (h.r >= 2) {
-        el("circle", {
-          cx: cxh, cy: cyh, r: rad * 0.55, fill: "none",
-          stroke: TH.slope, "stroke-width": 1.2, opacity: .35,
-          "stroke-dasharray": up ? "none" : "5 4"
-        }, hills);
-      }
-      // peak marker for a mound, basin marker for a hollow
-      if (up) el("circle", { cx: cxh, cy: cyh, r: 2.6, fill: TH.slope, opacity: .8 }, hills);
-      else el("circle", { cx: cxh, cy: cyh, r: 3.4, fill: "none", stroke: TH.slope, "stroke-width": 1.8, opacity: .8 }, hills);
-    });
-
     for (let y = 0; y < G.rows; y++) for (let x = 0; x < G.cols; x++) {
       const c = cell(G, x, y), X = x * C, Y = y * C;
       if (c.t === T.FAIR) el("rect", { x: X - 1, y: Y - 1, width: C + 2, height: C + 2, rx: 9, fill: TH.fairway }, terr);
@@ -215,14 +188,25 @@
           el("rect", { x: px(x) - 1.6, y: px(y) + 7, width: 3.2, height: 4, fill: TH.trunk }, g0);
         }
       } else if (c.slope >= 0) {
-        // A shaft plus a solid head: at a glance you can tell which way it
-        // pushes. The old dart shape was symmetrical enough to read backwards.
-        const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .9 }, feat);
+        // Shaft plus head, so the direction is unmistakable. A MOUND gets a
+        // solid head, a HOLLOW an open one -- which reads the same in colour or
+        // in plain ink, and needs no shading behind it to compete with the
+        // terrain underneath.
+        const isHill = c.hill > 0;
+        const col = c.hill === 1 ? TH.mound : c.hill === 2 ? TH.hollow : TH.slope;
+        const a = el("g", { transform: `translate(${px(x)},${px(y)}) rotate(${c.slope * 45})`, opacity: .95 }, feat);
         el("line", {
           x1: 0, y1: 8, x2: 0, y2: -2,
-          stroke: TH.slope, "stroke-width": 3, "stroke-linecap": "round"
+          stroke: col, "stroke-width": isHill ? 3.2 : 3, "stroke-linecap": "round"
         }, a);
-        el("polygon", { points: "0,-11 6.5,-1 -6.5,-1", fill: TH.slope }, a);
+        if (c.hill === 2) {
+          el("polygon", {
+            points: "0,-11 6.5,-1 -6.5,-1", fill: TH.paper,
+            stroke: col, "stroke-width": 2, "stroke-linejoin": "round"
+          }, a);
+        } else {
+          el("polygon", { points: "0,-11 6.5,-1 -6.5,-1", fill: col }, a);
+        }
       } else {
         const col = c.t === T.WATER ? TH.waterDot : c.t === T.FAIR ? TH.fairwayDot
           : c.t === T.SAND ? TH.sandDot : TH.roughDot;
@@ -966,16 +950,14 @@
       [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.sand}"/><line x1="3" y1="15" x2="15" y2="3" stroke="${T2.sandHatch}" stroke-width="2"/>`, "Sand", "\u22121 dot"],
       [`<rect x="1" y="1" width="16" height="16" rx="5" fill="${T2.water}"/>`, "Water", "fly over, never land"],
       [`<polygon points="6,3 11,13 1,13" fill="${T2.tree}"/><circle cx="14" cy="7" r="4" fill="${T2.treeAlt}"/>`, "Trees", "block unless from fairway"],
-      [`<circle cx="9" cy="9" r="8" fill="${T2.hillUp}"/><circle cx="9" cy="9" r="6" fill="none" stroke="${T2.slope}" stroke-width="1.2" opacity=".6"/>` +
-       `<circle cx="9" cy="9" r="1.8" fill="${T2.slope}"/>`,
-       "Mound", "rolls the ball 1 dot AWAY from the peak"],
-      [`<circle cx="9" cy="9" r="8" fill="${T2.hillDown}"/><circle cx="9" cy="9" r="6" fill="none" stroke="${T2.slope}" stroke-width="1.2" stroke-dasharray="3 2" opacity=".7"/>` +
-       `<circle cx="9" cy="9" r="2.4" fill="none" stroke="${T2.slope}" stroke-width="1.4"/>`,
-       "Hollow", "rolls the ball 1 dot TOWARD the bottom"],
-      [`<g transform="translate(9,9) rotate(45)">` +
-       `<line x1="0" y1="6" x2="0" y2="-1" stroke="${T2.slope}" stroke-width="2.2" stroke-linecap="round"/>` +
-       `<polygon points="0,-7.5 4.5,-0.5 -4.5,-0.5" fill="${T2.slope}"/></g>`,
-       "Arrows", "show exactly which way that dot rolls"],
+      [`<g transform="translate(9,9) rotate(135)">` +
+       `<line x1="0" y1="6" x2="0" y2="-1" stroke="${T2.mound}" stroke-width="2.2" stroke-linecap="round"/>` +
+       `<polygon points="0,-7.5 4.5,-0.5 -4.5,-0.5" fill="${T2.mound}"/></g>`,
+       "Mound", "solid arrows \u2014 roll 1 dot AWAY from the middle"],
+      [`<g transform="translate(9,9) rotate(-45)">` +
+       `<line x1="0" y1="6" x2="0" y2="-1" stroke="${T2.hollow}" stroke-width="2.2" stroke-linecap="round"/>` +
+       `<polygon points="0,-7.5 4.5,-0.5 -4.5,-0.5" fill="${T2.paper}" stroke="${T2.hollow}" stroke-width="1.5"/></g>`,
+       "Hollow", "open arrows \u2014 roll 1 dot TOWARD the middle"],
       [`<circle cx="9" cy="9" r="5" fill="${T2.paper}" stroke="${T2.tee}" stroke-width="2.4"/>`, "Tee", "start of the hole"],
       [`<circle cx="9" cy="9" r="5.5" fill="${T2.cup}"/>`, "Cup", "land on it, or 1 past"],
       [`<g opacity=".75"><ellipse cx="6" cy="10" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/><ellipse cx="12" cy="8" rx="2.2" ry="3.4" fill="${T2.bigfoot}"/></g>`, "Bigfoot", "click for a mulligan"],
@@ -1061,8 +1043,8 @@
     if (c.slope >= 0) {
       const dn = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][c.slope];
       const h = (G.hills || []).find(hh =>
-        Math.hypot(hh.x - x, hh.y - y) <= hh.r + 0.35);
-      const size = h ? (h.r === 1 ? "Small" : h.r === 2 ? "Medium" : "Large") : "";
+        x >= hh.x && x < hh.x + hh.n && y >= hh.y && y < hh.y + hh.n);
+      const size = h ? `${h.n}\u00D7${h.n}` : "";
       if (h) {
         return [
           `${size} ${h.kind} \u2014 rolls ${dn}`,

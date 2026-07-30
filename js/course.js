@@ -27,7 +27,7 @@
 
   function blank(cols, rows) {
     const cells = new Array(cols * rows);
-    for (let i = 0; i < cells.length; i++) cells[i] = { t: T.ROUGH, slope: -1, tree: 0 };
+    for (let i = 0; i < cells.length; i++) cells[i] = { t: T.ROUGH, slope: -1, tree: 0, hill: 0 };   // hill: 0 none, 1 mound, 2 hollow
     return { cols, rows, cells };
   }
 
@@ -191,97 +191,6 @@
         }
     }
 
-    /* ---- hills ----
-     * A hill is an AREA with a shape, not a scattered arrow. Land on a MOUND and
-     * the ball rolls one dot directly away from its peak; land in a HOLLOW and it
-     * rolls one dot toward the bottom. Direction comes from geometry, so a player
-     * can read it in advance and plan around it -- a hollow near the cup is worth
-     * aiming at, a mound beside water is a genuine hazard.
-     *
-     * Each cell inside a hill still carries a plain 0-7 direction in `slope`, so
-     * everything downstream (rolling, chaining, printing) is unchanged.
-     */
-    const nHills = Math.max(1, Math.round(ri(rng, 1, 2) * K));
-    g.hills = [];
-
-    // candidate centres: near the route so the ball actually meets them
-    const spots = [];
-    const seenSpot = new Uint8Array(cols * rows);
-    for (const pt of path) {
-      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-        const x = pt.x + dx, y = pt.y + dy;
-        if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
-        const k = y * cols + x;
-        if (seenSpot[k]) continue;
-        const c = cell(g, x, y);
-        if (c.t !== T.ROUGH && c.t !== T.FAIR) continue;
-        seenSpot[k] = 1;
-        spots.push({ x, y });
-      }
-    }
-    for (let i = spots.length - 1; i > 0; i--) {
-      const j = (rng() * (i + 1)) | 0;
-      const t2 = spots[i]; spots[i] = spots[j]; spots[j] = t2;
-    }
-
-    const dirOf = (dx, dy) => {
-      // snap a vector to one of the 8 compass directions in DIRS order
-      const ang = Math.atan2(dx, -dy);                 // 0 = North, clockwise
-      let k = Math.round(ang / (Math.PI / 4));
-      return ((k % 8) + 8) % 8;
-    };
-
-    for (const c0 of spots) {
-      if (g.hills.length >= nHills) break;
-      // weighted toward the smaller sizes: a board of nothing but big hills
-      // means no shot ever finishes where you aimed it
-      const rRoll = rng();
-      const r = rRoll < 0.52 ? 1 : rRoll < 0.86 ? 2 : 3;   // small / medium / large
-      // don't overlap an existing hill or crowd the cup
-      let clash = false;
-      for (const h of g.hills)
-        if (Math.max(Math.abs(h.x - c0.x), Math.abs(h.y - c0.y)) <= h.r + r + 1) clash = true;
-      if (clash) continue;
-      if (Math.max(Math.abs(c0.x - hole.x), Math.abs(c0.y - hole.y)) <= r + 1) continue;
-
-      const kind = rng() < 0.5 ? "mound" : "hollow";
-      let touched = 0;
-      const claimed = [];
-
-      for (let y = c0.y - r; y <= c0.y + r; y++) {
-        for (let x = c0.x - r; x <= c0.x + r; x++) {
-          const dx = x - c0.x, dy = y - c0.y;
-          if (Math.hypot(dx, dy) > r + 0.35) continue;   // round-ish footprint
-          if (!inB(g, x, y) || guardTeeHole(x, y)) continue;
-          const cc = cell(g, x, y);
-          if (cc.t !== T.ROUGH && cc.t !== T.FAIR) continue;
-          if (cc.slope >= 0) continue;
-
-          let dir;
-          if (dx === 0 && dy === 0) {
-            // The peak of a mound cannot hold a ball, so it tips a seeded way.
-            // The bottom of a hollow is exactly where a ball wants to sit.
-            if (kind === "hollow") { claimed.push([x, y, -1]); touched++; continue; }
-            dir = ri(rng, 0, 7);
-          } else {
-            dir = kind === "mound" ? dirOf(dx, dy) : dirOf(-dx, -dy);
-          }
-
-          // a roll that ends in water or trees is cancelled by the rules, so it
-          // would be a decoration rather than a hazard -- skip those cells
-          const nx = x + DIRS[dir].x, ny = y + DIRS[dir].y;
-          if (!inB(g, nx, ny)) continue;
-          const nt = cell(g, nx, ny).t;
-          if (nt === T.WATER || nt === T.TREE) continue;
-          claimed.push([x, y, dir]);
-          touched++;
-        }
-      }
-      if (touched < (r === 1 ? 3 : 5)) continue;         // too chewed up to read
-      claimed.forEach(([x, y, dir]) => { if (dir >= 0) cell(g, x, y).slope = dir; });
-      g.hills.push({ x: c0.x, y: c0.y, r, kind });
-    }
-
     /* ---- coverage pass ----
      * Terrain clusters along the tee-to-cup corridor, which left whole corners
      * of the board as bare dots and made the playfield look off-centre. Sweep a
@@ -325,6 +234,92 @@
           stampBlob(g, rng, cx0, cy0, 1, T.WATER, guardTeeHole);
         }
       }
+    }
+
+    /* ---- hills ----
+     * A hill is a small SQUARE block of dots -- 2x2, 3x3 or 4x4. Land on a MOUND
+     * and the ball rolls one dot away from the middle; land in a HOLLOW and it
+     * rolls one dot toward the middle. Direction comes from the block's shape,
+     * so it can be read in advance.
+     *
+     * A hill is only ever laid on plain rough where the WHOLE block is clear, so
+     * it never sits on top of water, sand, trees or fairway. Each cell keeps a
+     * plain 0-7 direction in `slope`, plus a `hill` tag for drawing.
+     */
+    const nHills = Math.max(1, Math.round(ri(rng, 1, 2) * K));
+    g.hills = [];
+
+    const spots = [];
+    const seenSpot = new Uint8Array(cols * rows);
+    for (const pt of path) {
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const x = pt.x + dx, y = pt.y + dy;
+        if (!inB(g, x, y)) continue;
+        const k = y * cols + x;
+        if (seenSpot[k]) continue;
+        seenSpot[k] = 1;
+        spots.push({ x, y });
+      }
+    }
+    for (let i = spots.length - 1; i > 0; i--) {
+      const j = (rng() * (i + 1)) | 0;
+      const t2 = spots[i]; spots[i] = spots[j]; spots[j] = t2;
+    }
+
+    const dirOf = (dx, dy) => {
+      const ang = Math.atan2(dx, -dy);            // 0 = North, clockwise
+      return ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
+    };
+
+    for (const c0 of spots) {
+      if (g.hills.length >= nHills) break;
+      const roll = rng();
+      const n = roll < 0.42 ? 2 : roll < 0.80 ? 3 : 4;      // 2x2 / 3x3 / 4x4
+      const x0 = c0.x, y0 = c0.y;
+      if (x0 < 1 || y0 < 1 || x0 + n > cols - 1 || y0 + n > rows - 1) continue;
+
+      // The whole block, plus a one-dot margin, must be plain empty rough so the
+      // hill can never overlap another feature.
+      let clear = true;
+      for (let y = y0 - 1; y <= y0 + n && clear; y++) {
+        for (let x = x0 - 1; x <= x0 + n && clear; x++) {
+          if (!inB(g, x, y)) continue;
+          const cc = cell(g, x, y);
+          const inside = x >= x0 && x < x0 + n && y >= y0 && y < y0 + n;
+          if (inside && (cc.t !== T.ROUGH || cc.slope >= 0 || guardTeeHole(x, y))) clear = false;
+          if (!inside && cc.hill) clear = false;                 // keep hills apart
+        }
+      }
+      if (!clear) continue;
+      // and not right on top of the cup
+      if (Math.max(Math.abs(x0 + n / 2 - hole.x), Math.abs(y0 + n / 2 - hole.y)) < n) continue;
+
+      const kind = rng() < 0.5 ? "mound" : "hollow";
+      const midX = x0 + (n - 1) / 2, midY = y0 + (n - 1) / 2;
+      const claimed = [];
+      for (let y = y0; y < y0 + n; y++) {
+        for (let x = x0; x < x0 + n; x++) {
+          const dx = x - midX, dy = y - midY;
+          let dir;
+          if (dx === 0 && dy === 0) {
+            // odd sizes have a true middle: a peak tips the ball off, a bottom holds it
+            if (kind === "hollow") continue;
+            dir = ri(rng, 0, 7);
+          } else {
+            dir = kind === "mound" ? dirOf(dx, dy) : dirOf(-dx, -dy);
+          }
+          const nx = x + DIRS[dir].x, ny = y + DIRS[dir].y;
+          if (!inB(g, nx, ny)) continue;
+          const nt = cell(g, nx, ny).t;
+          if (nt === T.WATER || nt === T.TREE) continue;   // the rules cancel these
+          claimed.push([x, y, dir]);
+        }
+      }
+      if (claimed.length < n) continue;                    // too clipped to read
+      const tag = kind === "mound" ? 1 : 2;
+      for (let y = y0; y < y0 + n; y++) for (let x = x0; x < x0 + n; x++) cell(g, x, y).hill = tag;
+      claimed.forEach(([x, y, dir]) => { cell(g, x, y).slope = dir; });
+      g.hills.push({ x: x0, y: y0, n, kind });
     }
 
     // Keep the cup and tee themselves clean.

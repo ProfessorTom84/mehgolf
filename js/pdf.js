@@ -54,7 +54,7 @@
    * A slope arrow with a shaft and a solid head. A bare triangle reads the same
    * upside down once it is printed small, which made the direction a guess.
    */
-  function drawSlopeArrow(d, P, cxp, cyp, cs, dirIdx) {
+  function drawSlopeArrow(d, P, cxp, cyp, cs, dirIdx, hill) {
     const [ux, uy] = DIR_VEC[dirIdx] || DIR_VEC[0];
     const L = cs * 0.4;                      // tip distance from centre
     const nx = -uy, ny = ux;                 // perpendicular
@@ -63,11 +63,18 @@
     const tailX = cxp - ux * L * 0.85, tailY = cyp - uy * L * 0.85;
     const hw = cs * 0.17;                    // head half-width
 
-    P.stroke("slope");
+    const key = hill === 1 ? "mound" : hill === 2 ? "hollow" : "slope";
+    P.stroke(key);
     d.lw(Math.max(0.7, cs * 0.085));
     d.line(tailX, tailY, neckX, neckY);
-    P.fill("slope");
-    d.poly([[tipX, tipY], [neckX + nx * hw, neckY + ny * hw], [neckX - nx * hw, neckY - ny * hw]]);
+    const head = [[tipX, tipY], [neckX + nx * hw, neckY + ny * hw], [neckX - nx * hw, neckY - ny * hw]];
+    if (hill === 2) {                 // hollow: open head, so it reads in plain ink too
+      P.stroke(key); d.lw(Math.max(0.6, cs * 0.07));
+      d.poly(head, "S");
+    } else {
+      P.fill(key);
+      d.poly(head);
+    }
   }
 
   /* Two print palettes. Greys keep the original notebook look and are cheap to
@@ -77,7 +84,7 @@
     tree: [0.15], trunk: [0.15], slope: [0.35],
     fairDot: [0.62], roughDot: [0.72], waterDot: [1]
 ,
-    hillUp: [0.93], hillDown: [0.86]
+    mound: [0.3], hollow: [0.45]
   };
   const COLOUR = {
     fair: [0.81, 0.89, 0.68], water: [0.50, 0.71, 0.86],
@@ -85,7 +92,7 @@
     tree: [0.18, 0.42, 0.23], trunk: [0.42, 0.31, 0.19],
     slope: [0.54, 0.48, 0.71],
     fairDot: [0.50, 0.63, 0.36], roughDot: [0.71, 0.75, 0.64], waterDot: [0.86, 0.93, 0.97],
-    hillUp: [0.94, 0.91, 0.96], hillDown: [0.87, 0.83, 0.92]
+    mound: [0.77, 0.44, 0.23], hollow: [0.36, 0.50, 0.75]
   };
 
   function painter(d, colour) {
@@ -98,23 +105,8 @@
 
   function drawHoleMap(d, g, x0, y0, cs, colour) {
     const cx = (x, y) => [x0 + x * cs + cs / 2, y0 + y * cs + cs / 2];
-    const PH_ = painter(d, colour);
-
-    // Hills first, so the arrows and trees print on top of the shading.
-    (g.hills || []).forEach(h => {
-      const [hx, hy] = cx(h.x, h.y);
-      const rad = (h.r + 0.45) * cs;
-      PH_.fill(h.kind === "mound" ? "hillUp" : "hillDown");
-      d.circle(hx, hy, rad);
-      PH_.stroke("slope");
-      d.lw(Math.max(0.6, cs * 0.05));
-      d.circle(hx, hy, rad - cs * 0.12, "S");
-      if (h.kind === "mound") { PH_.fill("slope"); d.circle(hx, hy, cs * 0.09); }
-      else { PH_.stroke("slope"); d.circle(hx, hy, cs * 0.12, "S"); }
-    });
     const P = painter(d, colour);
 
-    // terrain fills first
     for (let y = 0; y < g.rows; y++) for (let x = 0; x < g.cols; x++) {
       const c = cell(g, x, y), [px, py] = cx(x, y), h = cs / 2;
       if (c.t === T.FAIR) { P.fill("fair"); d.rect(px - h, py - h, cs, cs); }
@@ -138,7 +130,7 @@
         }
       } else if (c.t === T.WATER) { P.fill("waterDot"); d.circle(px, py, cs * 0.09); }
       else if (c.slope >= 0) {
-        drawSlopeArrow(d, P, px, py, cs, c.slope);
+        drawSlopeArrow(d, P, px, py, cs, c.slope, c.hill || 0);
       } else { P.fill(c.t === T.FAIR ? "fairDot" : "roughDot"); d.circle(px, py, cs * 0.07); }
     }
     // tee & cup on top
@@ -213,7 +205,7 @@
     const rules = [
       "Fairway is friendly. Hit from the big open patches and your ball goes 1 dot FURTHER, and it flies right over trees.",
       "Sand is grumpy. Hit from a striped patch and your ball goes 1 dot SHORTER.",
-      "Hills move your ball. Land on a shaded circle and follow the little arrow one more dot. A MOUND pushes you away from its middle; a HOLLOW pulls you toward it. If that dot is another arrow, keep going!",
+      "Hills move your ball. Land on a dot with an arrow and follow it one more dot. Solid arrows are a MOUND and push you away from the middle of the block; open arrows are a HOLLOW and pull you toward it. If you land on another arrow, keep going!",
       "You get do-overs. Your first shot on each hole can be re-rolled once for free. You also get 6 mulligans for the whole round - use one any time you hate your roll."
     ];
     rules.forEach(r => {
@@ -236,8 +228,8 @@
       ["sand",  "Sand",     "Hit from here: go 1 dot shorter."],
       ["water", "Water",    "You may fly over it. You may never land in it."],
       ["tree",  "Trees",    "Blocked - unless you are hitting from the fairway."],
-      ["mound", "Mound",    "Land on it and roll 1 dot AWAY from the middle."],
-      ["hollow","Hollow",   "Land on it and roll 1 dot TOWARD the middle."],
+      ["mound", "Mound",    "Solid arrows. Roll 1 dot AWAY from the middle of the block."],
+      ["hollow","Hollow",   "Open arrows. Roll 1 dot TOWARD the middle of the block."],
       ["slope", "Arrows",   "Printed on each dot, showing exactly which way it rolls."],
       ["tee",   "Tee",      "Where the hole starts."],
       ["cup",   "Cup",      "Land on it, or stop one dot past, to sink the ball."],
@@ -256,11 +248,8 @@
                               d.poly([[cx - 7, cy + 7], [cx, cy - 8], [cx + 7, cy + 7]]);
                               KP.fill("trunk"); d.rect(cx - 1.2, cy + 10, 2.4, 3); }
       if (kind === "slope") drawSlopeArrow(d, KP, cx, cy, 26, 3);   // SE, so the angle is obvious
-      if (kind === "mound")  { KP.fill("hillUp");   d.circle(cx, cy, 11);
-                               KP.stroke("slope"); d.lw(1); d.circle(cx, cy, 8, "S");
-                               KP.fill("slope");   d.circle(cx, cy, 2.2); }
-      if (kind === "hollow") { KP.fill("hillDown"); d.circle(cx, cy, 11);
-                               KP.stroke("slope"); d.lw(1); d.circle(cx, cy, 8, "S"); d.circle(cx, cy, 3, "S"); }
+      if (kind === "mound")  drawSlopeArrow(d, KP, cx, cy, 26, 3, 1);
+      if (kind === "hollow") drawSlopeArrow(d, KP, cx, cy, 26, 7, 2);
       if (kind === "tee")   { d.strokeG(0.05); d.lw(2); d.circle(cx, cy, 6, "S"); }
       if (kind === "cup")   { d.fillG(0.05); d.circle(cx, cy, 6); }
       if (kind === "foot")  { d.fillG(0.2); d.circle(cx - 3.5, cy + 2, 2.6); d.circle(cx + 3.5, cy - 1, 2.6); }
