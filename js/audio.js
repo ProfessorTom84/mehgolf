@@ -222,7 +222,7 @@
       }
     };
     const events = ["click", "touchstart", "touchend", "keydown"];
-    events.forEach(e => document.addEventListener(e, unlock, { passive: true }));
+    events.forEach(e => document.addEventListener(e, unlock));
   }
 
   if (typeof document !== "undefined") {
