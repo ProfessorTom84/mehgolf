@@ -673,7 +673,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
    one line, the hover strip and page footer are dropped (the bar and the turn
    card already say all of it), the caddie becomes a passing toast, and the
    secondary actions move into the More sheet. */
-@media (max-width:700px) and (min-height:541px){
+@media (max-width:980px) and (min-height:541px){
   #game{height:100dvh; max-height:100dvh; overflow:hidden}
 
   .game-bar{
@@ -851,7 +851,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
    Everything needed to take a shot lives in one screen: the board fills the
    space left over, the controls sit under it, and the reference panels move
    into a slide-up sheet behind the "Card" button. */
-@media (max-width:700px) and (min-height:541px){
+@media (max-width:980px) and (min-height:541px){
   #game{height:100dvh; max-height:100dvh; overflow:hidden}
   #game .table-felt{
     overflow:hidden; flex-direction:column; flex-wrap:nowrap; align-items:stretch;
@@ -919,130 +919,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   color: #6a6d64;
 }
 
-/* --- Mobile/Tablet Styles: Hide Paper and Floating Control HUD --- */
+/* Hide Play on paper path-card on mobile/tablet */
 @media (max-width: 980px) {
-  /* Hide Play on paper path-card on mobile/tablet */
   .paper-path {
     display: none !important;
-  }
-}
-
-@media (max-width: 980px) and (min-height: 541px) {
-  /* Prevent the body and main game view from scrolling */
-  body, html {
-    overflow: hidden !important;
-    position: fixed;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Force table-felt to fit the screen and prevent any scrolling */
-  #game .table-felt {
-    height: calc(100% - 50px) !important;
-    max-height: calc(100% - 50px) !important;
-    overflow: hidden !important;
-    position: relative !important;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
-  }
-
-  /* Make notebook fill 100% of the screen height under the game-bar */
-  .notebook {
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    margin: 0 auto !important;
-    overflow: hidden !important;
-  }
-
-  /* Transform side-right into a floating overlay HUD */
-  .side-right {
-    position: absolute !important;
-    left: 50% !important;
-    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
-    transform: translateX(-50%) !important;
-    width: calc(100% - 24px) !important;
-    max-width: 480px !important;
-    z-index: 30 !important;
-    pointer-events: none !important; /* Click through to the board */
-    background: none !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* Make sure the control tray itself is interactive and floating beautifully */
-  .side-right .tray {
-    pointer-events: auto !important; /* Receive pointer clicks */
-    background: rgba(250, 248, 242, 0.95) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    border: 3px solid var(--ink) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
-    padding: 0.5rem 0.6rem !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 0.35rem !important;
-    margin: 0 !important;
-    width: 100% !important;
-  }
-
-  /* Style turn-card, messages and controls nicely inside the floating tray */
-  .side-right .tray .turn-card {
-    border-width: 2px !important;
-    padding: 0.25rem 0.45rem !important;
-    border-radius: 6px !important;
-    background: #fff !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 0.5rem !important;
-    width: 100% !important;
-  }
-  .side-right .tray .turn-player {
-    font-size: 0.85rem !important;
-  }
-  .side-right .tray .turn-lie {
-    font-size: 0.72rem !important;
-    margin-left: auto !important;
-  }
-
-  /* Enable message box #msg inside the HUD floating panel */
-  .side-right .tray .msg {
-    display: block !important;
-    min-height: 0 !important;
-    font-size: 0.78rem !important;
-    line-height: 1.3 !important;
-    border-left: 2px solid var(--ink) !important;
-    padding-left: 0.4rem !important;
-    margin: 0.1rem 0 !important;
-    color: #444 !important;
-  }
-
-  /* Make controls wrapper flat, clean and layout-friendly */
-  .side-right .tray #controls {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 0.3rem !important;
-    width: 100% !important;
-  }
-
-  .side-right .tray .controls .row {
-    gap: 0.3rem !important;
-  }
-
-  /* Ensure mulligan count footer inside tray is beautifully integrated */
-  .side-right .tray .tray-foot {
-    margin-top: 0 !important;
-    font-size: 0.7rem !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-  }
-  .side-right .tray .mulligans {
-    font-size: 0.7rem !important;
-    margin: 0 !important;
-    padding: 0 !important;
   }
 }
