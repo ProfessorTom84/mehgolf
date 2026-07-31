@@ -668,6 +668,186 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .sheet{display:none}
 
 /* ---------- phone, upright ----------
+   The board is the game; everything else is overhead. On a phone it gets the
+   whole width and every pixel of height that is not a control. The top bar is
+   one line, the hover strip and page footer are dropped (the bar and the turn
+   card already say all of it), the caddie becomes a passing toast, and the
+   secondary actions move into the More sheet. */
+@media (max-width:700px) and (min-height:541px){
+  #game{height:100dvh; max-height:100dvh; overflow:hidden}
+
+  .game-bar{
+    flex-wrap:nowrap; gap:.35rem; padding:.15rem .4rem;
+    padding-top:max(.15rem, env(safe-area-inset-top));
+    min-height:0;
+  }
+  .game-bar .btn.small{min-height:32px; padding:.25rem .5rem; font-size:.7rem}
+  .game-title{
+    display:flex; align-items:baseline; gap:.35rem; min-width:0;
+    white-space:nowrap; overflow:hidden;
+  }
+  .game-bar h1{font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
+  #course-name{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom}
+  .game-bar .hole-count{font-size:.72rem; white-space:nowrap}
+  #seed-chip{display:none}
+  .turn-chip{margin-left:.25rem}
+  .game-bar-actions{margin-left:auto; flex:0 0 auto}
+
+  #game .table-felt{
+    overflow:hidden; flex-direction:column; flex-wrap:nowrap; align-items:stretch;
+    gap:.3rem; padding:.15rem .2rem calc(.25rem + env(safe-area-inset-bottom));
+  }
+
+  /* the board takes everything that is left */
+  .notebook{flex:1 1 auto; min-height:0; width:100%; align-self:stretch; filter:none}
+  .page{padding:5px; border-radius:8px; height:100%;
+        display:flex; flex-direction:column; justify-content:center}
+  #board-wrap{flex:0 0 auto}
+  .board-slot{display:none}      /* tap-to-inspect uses a toast instead */
+  .page-foot{display:none}       /* the bar and turn card already carry this */
+
+  /* one compact action bar */
+  .side-right{order:2; width:100%; flex:0 0 auto; max-height:none; overflow:visible}
+  .side-right .tray{
+    gap:.4rem; padding:.45rem .55rem;
+    display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:.6rem;
+  }
+  .tray .panel-head{display:none}
+  .tray .caddie{display:none}
+  .tray .msg{display:none}
+  .turn-card{grid-column:1; padding:.3rem .5rem; border-width:2px; min-width:7.4rem}
+  .turn-player{font-size:.9rem; gap:.35rem}
+  .turn-lie{font-size:.66rem}
+  #controls{grid-column:2}
+  .tray-foot{grid-column:1 / -1; margin-top:-.15rem}
+  .mulligans{font-size:.66rem}
+  .roll-readout{padding:.25rem .5rem; gap:.4rem}
+  .roll-readout .num{font-size:1.3rem}
+  .roll-readout .calc{font-size:.62rem}
+  .controls .row{gap:.35rem}
+
+  /* toasts over the board */
+  .caddie-toast{
+    position:absolute; left:6px; right:6px; bottom:6px; z-index:6;
+    background:rgba(250,248,242,.95); border-left:3px solid var(--p3);
+    border-radius:0 8px 8px 0; padding:.35rem .55rem;
+    font-size:.74rem; font-style:italic; line-height:1.35; pointer-events:none;
+    box-shadow:0 4px 12px rgba(0,0,0,.18);
+    animation:toast-fade 4.2s ease-out forwards;
+  }
+  @keyframes toast-fade{
+    0%{opacity:0; transform:translateY(6px)}
+    8%{opacity:1; transform:translateY(0)}
+    82%{opacity:1}
+    100%{opacity:0}
+  }
+
+  /* the More sheet */
+  .sheet{
+    display:block; position:fixed; inset:0; z-index:40;
+    background:rgba(20,26,22,.55); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .18s ease;
+    padding:3rem .6rem calc(.6rem + env(safe-area-inset-bottom));
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  body.sheet-open .sheet{opacity:1; pointer-events:auto}
+  .sheet > *{margin-bottom:.6rem; transform:translateY(14px); transition:transform .18s ease}
+  body.sheet-open .sheet > *{transform:translateY(0)}
+  .sheet .side-left{display:flex; flex-direction:column; gap:.6rem; width:100%; max-height:none}
+  .sheet .history, .sheet .legend-panel, .sheet .score-panel{max-height:44dvh}
+  .sheet-tools{
+    display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center;
+    background:var(--paper); border-radius:var(--radius); padding:.6rem;
+  }
+  .sheet-tools .btn{flex:1 1 auto; min-width:6rem; min-height:44px}
+}
+
+/* ---------- phones (shared) ---------- */
+@media (max-width:700px){
+  .game-bar{
+    padding:.45rem .6rem; gap:.4rem; flex-wrap:wrap;
+    padding-top:max(.45rem, env(safe-area-inset-top));
+  }
+  .game-bar h1, #course-name{font-size:.95rem}
+  .game-bar .hole-count{font-size:.78rem}
+  .build-tag{display:none}
+  #sheet-btn{display:inline-flex}
+  .game-bar-actions{gap:.3rem}
+  .game-bar-actions .btn{font-size:.7rem; padding-left:.5rem; padding-right:.5rem}
+
+  .table-felt{padding:0 .5rem calc(.6rem + env(safe-area-inset-bottom)); gap:.7rem}
+  .side{width:100%; flex-basis:auto}
+  .panel{padding:.6rem .7rem}
+  .history{max-height:170px}
+  .legend-panel{max-height:190px}
+  .score-panel{max-height:260px}
+
+  .page{padding:10px 10px 6px}
+  .page-foot{font-size:.68rem}
+  .course-card{max-width:100%}
+  .cc-name{font-size:1.3rem}
+  .cc-hist{font-size:.8rem}
+  .banner-card{padding:1rem .9rem; max-width:94vw}
+  .menu-card{padding:.8rem .9rem .7rem}
+  .masthead h1{font-size:1.6rem}
+  .masthead{margin-bottom:.35rem}
+  .tagline{display:none}
+  .menu-paths{gap:.7rem}
+  .path-card{padding:.65rem .75rem .75rem; gap:.45rem}
+  .path-head p{display:none}          /* the heading already says it */
+  .course-blurb{
+    font-size:.68rem; min-height:0; max-height:4.4em; overflow:hidden;
+  }
+  .field label{font-size:.66rem}
+  .hint{font-size:.66rem}
+  .paper-points{font-size:.7rem}
+  .menu-foot{margin-top:.45rem}
+  .credit{font-size:.62rem}
+}
+
+@media (max-width:980px){
+  #game{height:auto; max-height:none; overflow:visible}
+  #game .table-felt{overflow:visible}
+  .table-felt{flex-wrap:wrap; flex-direction:column; align-items:center}
+  .side{width:min(560px,100%); flex-basis:auto; max-height:none}
+  .side-left{order:3}
+  .history{max-height:200px}
+  .legend-panel{max-height:none}
+  .score-panel{max-height:240px}
+  #board-wrap svg{width:min(92vw,560px)}
+  .side-right{order:1}       /* controls sit directly under the board */
+  .side-left{order:2}
+}
+/* ---------- phone in landscape ----------
+   Short and wide. Stacking would push the controls a screen away, so keep the
+   columns side by side and fit the board to the height instead. */
+@media (max-height:540px) and (min-width:620px){
+  #game{height:100dvh; max-height:100dvh; overflow:hidden}
+  #game .table-felt{overflow:hidden; flex-wrap:nowrap; flex-direction:row; align-items:flex-start}
+  .side{width:min(200px, 26vw); flex:0 0 min(200px, 26vw); max-height:100%; order:0}
+  .side-left{order:0}
+  .side-right{order:0}
+  .panel{padding:.5rem .6rem; gap:.4rem}
+  .panel-head{font-size:.6rem; padding-bottom:.25rem}
+  .history{max-height:none}
+  .legend-panel{max-height:none}
+  .score-panel{max-height:none}
+  .caddie{display:none}                 /* the board and the controls come first */
+  .tray .btn.big{font-size:.82rem; padding:.5rem .4rem}
+  .board-slot{height:34px; flex-basis:34px}
+  .board-tip{font-size:.68rem; padding-top:2px}
+  .page-foot{font-size:.62rem; margin-top:4px}
+  .game-bar{padding:.3rem .6rem}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s !important; transition-duration:.001s !important}
+}
+
+/* The sheet only exists on phones; elsewhere it is inert. */
+.sheet{display:none}
+
+/* ---------- phone, upright ----------
    Everything needed to take a shot lives in one screen: the board fills the
    space left over, the controls sit under it, and the reference panels move
    into a slide-up sheet behind the "Card" button. */

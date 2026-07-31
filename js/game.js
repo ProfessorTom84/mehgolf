@@ -365,14 +365,20 @@
       const n = document.querySelector(sel);
       if (n) belowH += n.getBoundingClientRect().height;
     });
-    // On a phone the controls sit BELOW the board in the same column, so their
-    // height has to come out of the board's budget too -- otherwise the board
-    // stretches to the bottom of the screen and covers them.
+    /* On a phone, measure the space the flex layout has ALREADY allocated rather
+     * than the window. Safari's URL bar slides in and out as you touch the
+     * screen, changing innerHeight -- which was making the board jump about
+     * while playing. The container is sized in dvh, so it holds still. */
+    let maxH;
     if (typeof phoneQ === "function" && phoneQ()) {
+      const felt = document.querySelector(".table-felt");
       const tray = document.querySelector(".side-right");
-      if (tray) belowH += tray.getBoundingClientRect().height + 12;
+      const feltH = felt ? felt.clientHeight : (vpH - top);
+      const trayH = tray ? tray.getBoundingClientRect().height : 0;
+      maxH = Math.max(150, feltH - trayH - belowH - 12);
+    } else {
+      maxH = Math.max(150, vpH - top - belowH - 20);
     }
-    const maxH = Math.max(150, vpH - top - belowH - 20);
 
     const scale = Math.min(maxW / vw, maxH / vh);
     const w = Math.floor(vw * scale), h = Math.floor(vh * scale);
@@ -938,6 +944,8 @@
   }
 
   function renderControls() {
+    const hint = $("#roll-hint");
+    if (hint) hint.classList.toggle("hidden", !(S.phase === "roll" && phoneQ()));
     const c = $("#controls"); c.innerHTML = "";
     const p = P();
     if (!p || S.phase === "between" || S.phase === "over") return;
@@ -1139,7 +1147,12 @@
       if (!info) { tip.classList.add("hidden"); return; }
       tip.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`;
       tip.classList.remove("hidden");
+      if (phoneQ()) {                       // it floats over the board and fades
+        clearTimeout(tipTimer);
+        tipTimer = setTimeout(() => { cur = ""; tip.classList.add("hidden"); }, 2600);
+      }
     }
+    let tipTimer = null;
 
     svg.addEventListener("mousemove", e => inspectAt(e.clientX, e.clientY));
     svg.addEventListener("mouseleave", () => { cur = ""; tip.classList.add("hidden"); });
@@ -1149,6 +1162,9 @@
     svg.addEventListener("pointerdown", e => {
       if (e.pointerType === "mouse") return;
       if (e.target.closest && e.target.closest(".aim-arrow")) return;
+      // On a phone the page IS the roll button -- there is no room for a
+      // separate one, and flicking the paper is how you'd do it for real.
+      if (S.phase === "roll" && phoneQ()) { doRoll(); return; }
       inspectAt(e.clientX, e.clientY, true);
     }, { passive: true });
   }
@@ -1199,12 +1215,30 @@
     // One line per turn: the card re-renders several times per shot, and each
     // render must not burn another line off the deck.
     const key = `${S.holeIdx}|${S.cur}|${p.strokes}`;
+    let fresh = false;
     if (key !== S.caddieKey) {
       S.caddieKey = key;
       S.caddieText = Caddie.take(caddieBucket(p));
+      fresh = true;
     }
     box.classList.remove("hidden");
     box.innerHTML = `<span class="caddie-label">Caddie</span><p>${S.caddieText}</p>`;
+    if (fresh && typeof phoneQ === "function" && phoneQ()) caddieToast(S.caddieText);
+  }
+
+  /** On a phone the caddie has no room to live permanently, so it drops in. */
+  let caddieTimer = null;
+  function caddieToast(text) {
+    const host = $("#board-wrap");
+    if (!host) return;
+    const prev = host.querySelector(".caddie-toast");
+    if (prev) prev.remove();
+    const t = document.createElement("div");
+    t.className = "caddie-toast";
+    t.textContent = text;
+    host.appendChild(t);
+    clearTimeout(caddieTimer);
+    caddieTimer = setTimeout(() => t.remove(), 4200);
   }
 
   /* ---------------- shot history ---------------- */
@@ -1689,18 +1723,35 @@
    */
   function syncLayout() {
     const sheet = $("#sheet");
+    if (sheet && !document.getElementById("sheet-tools")) {
+      const t = document.createElement("div");
+      t.id = "sheet-tools"; t.className = "sheet-tools";
+      sheet.appendChild(t);
+    }
     const left = document.querySelector(".side-left");
     const legend = document.querySelector(".legend-panel");
     if (!sheet || !left || !legend) return;
     if (!sheetHome) sheetHome = { leftParent: left.parentNode, legendParent: legend.parentNode };
 
+    const acts = document.querySelector(".game-bar-actions");
+    const tools = $("#sheet-tools");
     if (phoneQ()) {
       if (left.parentNode !== sheet) sheet.appendChild(left);
       if (legend.parentNode !== sheet) sheet.appendChild(legend);
+      // Print & Play / Save / Ink are rarely used mid-round; they were forcing
+      // the bar onto a second line, so they move into the sheet.
+      if (tools) ["pdf-btn2", "save-btn", "theme-btn"].forEach(id => {
+        const b = document.getElementById(id);
+        if (b && b.parentNode !== tools) tools.appendChild(b);
+      });
     } else {
       document.body.classList.remove("sheet-open");
       if (left.parentNode !== sheetHome.leftParent) sheetHome.leftParent.insertBefore(left, sheetHome.leftParent.firstChild);
       if (legend.parentNode !== sheetHome.legendParent) sheetHome.legendParent.appendChild(legend);
+      if (acts) ["pdf-btn2", "save-btn", "theme-btn"].forEach(id => {
+        const b = document.getElementById(id);
+        if (b && b.parentNode !== acts) acts.insertBefore(b, acts.firstChild);
+      });
     }
     fitBoardSettled(true);
   }
@@ -1800,6 +1851,7 @@
     });
     $("#save-btn").addEventListener("click", downloadBoardImage);
     $("#seed-input").addEventListener("input", refreshBlurb);
+    $("#roll-hint").addEventListener("click", e => { e.stopPropagation(); doRoll(); });
     $("#sheet-btn").addEventListener("click", () => {
       document.body.classList.toggle("sheet-open");
       SFX.page();
