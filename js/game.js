@@ -945,7 +945,7 @@
 
   function renderControls() {
     const hint = $("#roll-hint");
-    if (hint) hint.classList.toggle("hidden", !(S.phase === "roll" && phoneQ()));
+    if (hint) hint.classList.add("hidden");
     const c = $("#controls"); c.innerHTML = "";
     const p = P();
     if (!p || S.phase === "between" || S.phase === "over") return;
@@ -1187,9 +1187,6 @@
     svg.addEventListener("pointerdown", e => {
       if (e.pointerType === "mouse") return;
       if (e.target.closest && e.target.closest(".aim-arrow")) return;
-      // On a phone the page IS the roll button -- there is no room for a
-      // separate one, and flicking the paper is how you'd do it for real.
-      if (S.phase === "roll" && phoneQ()) { doRoll(); return; }
       inspectAt(e.clientX, e.clientY, true);
     }, { passive: true });
   }
