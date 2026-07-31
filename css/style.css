@@ -37,7 +37,8 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   height:100dvh; max-height:100dvh;             /* the real visible area on iOS */
   display:flex; flex-direction:column; overflow:hidden;
 }
-#game .game-bar{flex:0 0 auto}
+#game .game-bar{position:relative; z-index:60;
+  flex:0 0 auto}
 #game .table-felt{flex:1 1 auto; min-height:0; overflow:hidden}
 
 /* ---------- buttons ---------- */
@@ -330,12 +331,14 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   display:flex; align-items:center; gap:.7rem; justify-content:center;
   border:2px dashed var(--graphite); border-radius:8px; padding:.5rem;
 }
+.roll-readout.putting{border-style:solid; border-color:var(--p3)}
 .roll-readout .num{font-size:1.7rem; font-weight:700}
 .roll-readout .calc{font-size:.8rem; color:#6a6d64; text-align:left}
 .mulligans{font-size:.8rem; color:#6a6d64}
 .mull-pip{display:inline-block; width:10px; height:10px; border:1.5px solid var(--ink); border-radius:2px; margin-right:3px; vertical-align:-1px}
 .mull-pip.used{background:var(--ink); opacity:.35}
 
+#sheet-btn{display:none}
 .build-tag{font-size:.62rem; color:#7f8a80; letter-spacing:.1em; margin-left:.5rem}
 
 .legend-inline{overflow-y:auto; display:grid; gap:.18rem; font-size:.74rem}
@@ -579,7 +582,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   .board-tip{font-size:.8rem}
 }
 
-/* ---------- phones ---------- */
+/* ---------- phones (shared) ---------- */
 @media (max-width:700px){
   .game-bar{
     padding:.45rem .6rem; gap:.4rem; flex-wrap:wrap;
@@ -588,6 +591,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   .game-bar h1, #course-name{font-size:.95rem}
   .game-bar .hole-count{font-size:.78rem}
   .build-tag{display:none}
+  #sheet-btn{display:inline-flex}
   .game-bar-actions{gap:.3rem}
   .game-bar-actions .btn{font-size:.7rem; padding-left:.5rem; padding-right:.5rem}
 
@@ -658,4 +662,50 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s !important; transition-duration:.001s !important}
+}
+
+/* The sheet only exists on phones; elsewhere it is inert. */
+.sheet{display:none}
+
+/* ---------- phone, upright ----------
+   Everything needed to take a shot lives in one screen: the board fills the
+   space left over, the controls sit under it, and the reference panels move
+   into a slide-up sheet behind the "Card" button. */
+@media (max-width:700px) and (min-height:541px){
+  #game{height:100dvh; max-height:100dvh; overflow:hidden}
+  #game .table-felt{
+    overflow:hidden; flex-direction:column; flex-wrap:nowrap; align-items:stretch;
+    gap:.45rem; padding:0 .5rem calc(.4rem + env(safe-area-inset-bottom));
+  }
+  .notebook{flex:1 1 auto; min-height:0; align-self:center}
+  .side-right{order:2; width:100%; flex:0 0 auto; max-height:none; overflow:visible}
+  .side-right .tray{gap:.4rem; padding:.5rem .6rem}
+  .tray .panel-head{display:none}
+  .turn-card{padding:.35rem .55rem}
+  .turn-player{font-size:.95rem}
+  .caddie{padding:.3rem .5rem}
+  .caddie p{font-size:.72rem; -webkit-line-clamp:2; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden}
+  .msg{min-height:0; font-size:.8rem}
+  .roll-readout{padding:.3rem .5rem}
+  .roll-readout .num{font-size:1.4rem}
+  .mulligans{font-size:.72rem}
+  .board-slot{height:34px; flex-basis:34px}
+  .page-foot{margin-top:5px}
+
+  /* the slide-up sheet */
+  .sheet{
+    display:block; position:fixed; inset:0; z-index:40;
+    background:rgba(20,26,22,.5); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .18s ease;
+    padding:3.2rem .6rem calc(.6rem + env(safe-area-inset-bottom));
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  body.sheet-open .sheet{opacity:1; pointer-events:auto}
+  .sheet > *{
+    margin-bottom:.6rem; transform:translateY(14px); transition:transform .18s ease;
+  }
+  body.sheet-open .sheet > *{transform:translateY(0)}
+  .sheet .side-left{display:flex; flex-direction:column; gap:.6rem; width:100%; max-height:none}
+  .sheet .panel{max-height:46dvh}
+  .sheet .history, .sheet .legend-panel, .sheet .score-panel{max-height:46dvh}
 }

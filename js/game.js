@@ -16,7 +16,7 @@
     ps: [],                    // player state
     cur: 0,
     phase: "idle",             // roll | rolled | aim | anim | between | over
-    rolled: 0, moveN: 0, moveKind: "roll", // roll|putt|driver|iron
+    rolled: 0, moveN: 0, moveKind: "roll", rollMoveN: 0, // roll|putt|driver|iron
     bigfootFound: false,
     wobble: null,              // seeded rng for hand-drawn jitter
     log: [],                   // shot history
@@ -365,7 +365,14 @@
       const n = document.querySelector(sel);
       if (n) belowH += n.getBoundingClientRect().height;
     });
-    const maxH = Math.max(200, vpH - top - belowH - 24);
+    // On a phone the controls sit BELOW the board in the same column, so their
+    // height has to come out of the board's budget too -- otherwise the board
+    // stretches to the bottom of the screen and covers them.
+    if (typeof phoneQ === "function" && phoneQ()) {
+      const tray = document.querySelector(".side-right");
+      if (tray) belowH += tray.getBoundingClientRect().height + 12;
+    }
+    const maxH = Math.max(150, vpH - top - belowH - 20);
 
     const scale = Math.min(maxW / vw, maxH / vh);
     const w = Math.floor(vw * scale), h = Math.floor(vh * scale);
@@ -887,7 +894,7 @@
     S.phase = "rolled";
     const fromT = terrainAt(p.pos);
     const n = effMove(v, fromT);
-    S.moveN = n; S.moveKind = "roll";
+    S.moveN = n; S.moveKind = "roll"; S.rollMoveN = n;
     const mod = fromT === T.FAIR ? " +1 fairway" : fromT === T.SAND ? " \u22121 sand" : "";
     msg(`Rolled ${v}${mod} \u2192 the ball will travel ${n}. Pick a direction${n > 1 ? ", or putt instead" : ""}.`);
     enterAim(n, "roll");
@@ -940,13 +947,27 @@
       if (S.phase === "roll") {
         c.appendChild(btn("Roll the die", "primary big", () => doRoll()));
       } else if (S.phase === "rolled" || S.phase === "aim") {
+        const rollN = S.rollMoveN || S.moveN;
+        const putting = S.moveKind === "putt";
         const ro = document.createElement("div");
-        ro.className = "roll-readout";
-        ro.innerHTML = `<span class="num">${S.rolled || "?"}</span>
-          <span class="calc">${fromT === T.FAIR ? "+1 fairway" : fromT === T.SAND ? "\u22121 sand" : "flat lie"}<br>moves ${S.moveN}</span>`;
+        ro.className = "roll-readout" + (putting ? " putting" : "");
+        ro.innerHTML = `<span class="num">${putting ? 1 : (S.rolled || "?")}</span>
+          <span class="calc">${putting
+            ? `putting instead<br>of the ${rollN}`
+            : `${fromT === T.FAIR ? "+1 fairway" : fromT === T.SAND ? "\u22121 sand" : "flat lie"}<br>moves ${S.moveN}`}</span>`;
         c.appendChild(ro);
         const row = document.createElement("div"); row.className = "row";
-        row.appendChild(btn("Putt (1)", "", () => { enterAim(1, "putt"); renderControls(); }, S.moveN === 1 && S.moveKind !== "putt"));
+        // The choice between the roll and a putt is a TOGGLE. Previously picking
+        // "Putt" threw the roll away with no way back.
+        if (putting) {
+          row.appendChild(btn(`Use the ${rollN}`, "", () => {
+            enterAim(rollN, "roll"); renderControls();
+          }, rollN === 1));
+        } else {
+          row.appendChild(btn("Putt (1)", "", () => {
+            enterAim(1, "putt"); renderControls();
+          }, rollN === 1));
+        }
         const isTee = p.strokes === 0;
         if (isTee && !p.teeRerollUsed) {
           row.appendChild(btn("Tee re-roll", "", () => { p.teeRerollUsed = true; doRoll(); }));
@@ -1657,6 +1678,33 @@
       `${c.history} ${c.known} ${c.warning}<br><i>&ldquo;${c.motto}&rdquo;</i>`;
   }
 
+  /* ---------------- phone layout ---------------- */
+  const phoneQ = () => window.matchMedia("(max-width:700px) and (min-height:541px)").matches;
+  let sheetHome = null;
+
+  /**
+   * On a phone the board plus the controls is all that fits in one screen, so
+   * the reference panels (history, scorecard, legend) move into a slide-up
+   * sheet. On anything larger they go back to their columns.
+   */
+  function syncLayout() {
+    const sheet = $("#sheet");
+    const left = document.querySelector(".side-left");
+    const legend = document.querySelector(".legend-panel");
+    if (!sheet || !left || !legend) return;
+    if (!sheetHome) sheetHome = { leftParent: left.parentNode, legendParent: legend.parentNode };
+
+    if (phoneQ()) {
+      if (left.parentNode !== sheet) sheet.appendChild(left);
+      if (legend.parentNode !== sheet) sheet.appendChild(legend);
+    } else {
+      document.body.classList.remove("sheet-open");
+      if (left.parentNode !== sheetHome.leftParent) sheetHome.leftParent.insertBefore(left, sheetHome.leftParent.firstChild);
+      if (legend.parentNode !== sheetHome.legendParent) sheetHome.legendParent.appendChild(legend);
+    }
+    fitBoardSettled(true);
+  }
+
   /* ---------------- menu / boot ---------------- */
   function readMenu() {
     // Seeds are restricted to a safe charset: they get interpolated into HTML,
@@ -1752,6 +1800,15 @@
     });
     $("#save-btn").addEventListener("click", downloadBoardImage);
     $("#seed-input").addEventListener("input", refreshBlurb);
+    $("#sheet-btn").addEventListener("click", () => {
+      document.body.classList.toggle("sheet-open");
+      SFX.page();
+    });
+    $("#sheet").addEventListener("click", e => {
+      if (e.target.id === "sheet") document.body.classList.remove("sheet-open");
+    });
+    syncLayout();
+    window.addEventListener("resize", () => { clearTimeout(window.__lay); window.__lay = setTimeout(syncLayout, 120); });
     refreshBlurb();
 
     $("#theme-picker").addEventListener("click", e => {
