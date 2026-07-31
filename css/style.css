@@ -15,6 +15,9 @@
   --mono:"Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+button, .aim-arrow, .btn{touch-action:manipulation; -webkit-tap-highlight-color:transparent}
+.history-list, .legend-inline, .scorecard-inline, .rules-body, .tray{-webkit-overflow-scrolling:touch}
 html,body{margin:0;padding:0}
 body{
   font-family:var(--mono);
@@ -26,10 +29,14 @@ body{
 }
 button{font-family:inherit;color:inherit;cursor:pointer}
 .hidden{display:none !important}
-.screen{min-height:100vh}
+.screen{min-height:100vh; min-height:100dvh}
 /* The game screen is pinned to the viewport so the board never forces the
    page to scroll; the board scales itself to whatever height is left. */
-#game{height:100vh; max-height:100vh; display:flex; flex-direction:column; overflow:hidden}
+#game{
+  height:100vh; max-height:100vh;               /* fallback */
+  height:100dvh; max-height:100dvh;             /* the real visible area on iOS */
+  display:flex; flex-direction:column; overflow:hidden;
+}
 #game .game-bar{flex:0 0 auto}
 #game .table-felt{flex:1 1 auto; min-height:0; overflow:hidden}
 
@@ -52,9 +59,16 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 /* ---------- menu ---------- */
 /* The menu is pinned to the viewport: it lays out in two columns on anything
    desktop-sized so the whole thing fits without scrolling. */
-#menu{display:grid; place-items:center; padding:1rem; height:100vh; overflow:hidden}
+#menu{
+  display:grid; place-items:center; padding:1rem; overflow:hidden;
+  height:100vh; height:100dvh;
+  padding-left:max(1rem, env(safe-area-inset-left));
+  padding-right:max(1rem, env(safe-area-inset-right));
+  padding-bottom:max(1rem, env(safe-area-inset-bottom));
+}
 .menu-card{
-  width:min(920px,100%); max-height:calc(100vh - 2rem); overflow-y:auto; overflow-x:hidden;
+  width:min(920px,100%); max-height:calc(100dvh - 2rem); overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
   display:flex; flex-direction:column;
   background:var(--paper);
   border-radius:var(--radius);
@@ -344,6 +358,40 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .sc-table tr.tot td{border-top:2px solid var(--ink); border-bottom:0; font-weight:700; padding-top:.25rem}
 .sc-under{color:#1F8A46} .sc-over{color:#B4762A}
 
+/* ---------- course card ---------- */
+.course-card{max-width:26rem; margin:0 auto; text-align:center}
+.cc-est{
+  font-size:.62rem; letter-spacing:.28em; text-transform:uppercase; color:#7a7d74;
+}
+.cc-name{
+  margin:.15rem 0 .3rem !important; font-size:1.75rem; letter-spacing:.1em;
+  text-transform:uppercase; line-height:1.05;
+}
+.cc-rule{
+  height:2px; background:var(--ink); margin:.35rem auto .55rem; width:74%;
+  position:relative;
+}
+.cc-rule::after{
+  content:""; position:absolute; left:50%; top:-3px; width:8px; height:8px;
+  transform:translateX(-50%) rotate(45deg); background:var(--ink);
+}
+.cc-hist{margin:.3rem 0 !important; font-size:.86rem; line-height:1.55}
+.cc-colour{margin:.45rem 0 !important; font-size:.8rem; color:#6a6d64; font-style:italic}
+.cc-motto{
+  margin:.6rem 0 .2rem !important; font-size:.95rem; font-weight:700; letter-spacing:.04em;
+}
+.cc-code{
+  margin-top:.5rem; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase;
+  color:#8a8d84; border-top:1px dashed var(--graphite); padding-top:.45rem;
+}
+.cb-est{font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:#8a8d84}
+.sc-head{
+  border-bottom:1px dashed var(--graphite); padding-bottom:.4rem; margin-bottom:.4rem;
+  font-size:.76rem; line-height:1.35;
+}
+.sc-motto{margin:.18rem 0 0; font-weight:700; font-size:.72rem}
+.sc-colour{margin:.18rem 0 0; font-size:.68rem; color:#7a7d74; font-style:italic}
+
 /* ---------- whose turn it is ---------- */
 .tray.multi{
   border-top:5px solid var(--turn, var(--ink));
@@ -520,6 +568,59 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 @media (max-width:1240px){
   .side{width:224px; flex-basis:224px}
 }
+/* ---------- touch devices ---------- */
+@media (pointer: coarse){
+  /* Apple's 44pt minimum: every control needs a thumb-sized target. */
+  .btn{min-height:44px; padding-top:.55rem; padding-bottom:.55rem}
+  .btn.small{min-height:38px}
+  .segmented button{min-height:44px; padding:.5rem 1rem}
+  .seed-row input, .path-card select{min-height:44px; font-size:16px}  /* 16px stops iOS zooming on focus */
+  .game-bar-actions .btn{min-height:38px}
+  .board-tip{font-size:.8rem}
+}
+
+/* ---------- phones ---------- */
+@media (max-width:700px){
+  .game-bar{
+    padding:.45rem .6rem; gap:.4rem; flex-wrap:wrap;
+    padding-top:max(.45rem, env(safe-area-inset-top));
+  }
+  .game-bar h1, #course-name{font-size:.95rem}
+  .game-bar .hole-count{font-size:.78rem}
+  .build-tag{display:none}
+  .game-bar-actions{gap:.3rem}
+  .game-bar-actions .btn{font-size:.7rem; padding-left:.5rem; padding-right:.5rem}
+
+  .table-felt{padding:0 .5rem calc(.6rem + env(safe-area-inset-bottom)); gap:.7rem}
+  .side{width:100%; flex-basis:auto}
+  .panel{padding:.6rem .7rem}
+  .history{max-height:170px}
+  .legend-panel{max-height:190px}
+  .score-panel{max-height:260px}
+
+  .page{padding:10px 10px 6px}
+  .page-foot{font-size:.68rem}
+  .course-card{max-width:100%}
+  .cc-name{font-size:1.3rem}
+  .cc-hist{font-size:.8rem}
+  .banner-card{padding:1rem .9rem; max-width:94vw}
+  .menu-card{padding:.8rem .9rem .7rem}
+  .masthead h1{font-size:1.6rem}
+  .masthead{margin-bottom:.35rem}
+  .tagline{display:none}
+  .menu-paths{gap:.7rem}
+  .path-card{padding:.65rem .75rem .75rem; gap:.45rem}
+  .path-head p{display:none}          /* the heading already says it */
+  .course-blurb{
+    font-size:.68rem; min-height:0; max-height:4.4em; overflow:hidden;
+  }
+  .field label{font-size:.66rem}
+  .hint{font-size:.66rem}
+  .paper-points{font-size:.7rem}
+  .menu-foot{margin-top:.45rem}
+  .credit{font-size:.62rem}
+}
+
 @media (max-width:980px){
   #game{height:auto; max-height:none; overflow:visible}
   #game .table-felt{overflow:visible}
@@ -530,7 +631,31 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   .legend-panel{max-height:none}
   .score-panel{max-height:240px}
   #board-wrap svg{width:min(92vw,560px)}
+  .side-right{order:1}       /* controls sit directly under the board */
+  .side-left{order:2}
 }
+/* ---------- phone in landscape ----------
+   Short and wide. Stacking would push the controls a screen away, so keep the
+   columns side by side and fit the board to the height instead. */
+@media (max-height:540px) and (min-width:620px){
+  #game{height:100dvh; max-height:100dvh; overflow:hidden}
+  #game .table-felt{overflow:hidden; flex-wrap:nowrap; flex-direction:row; align-items:flex-start}
+  .side{width:min(200px, 26vw); flex:0 0 min(200px, 26vw); max-height:100%; order:0}
+  .side-left{order:0}
+  .side-right{order:0}
+  .panel{padding:.5rem .6rem; gap:.4rem}
+  .panel-head{font-size:.6rem; padding-bottom:.25rem}
+  .history{max-height:none}
+  .legend-panel{max-height:none}
+  .score-panel{max-height:none}
+  .caddie{display:none}                 /* the board and the controls come first */
+  .tray .btn.big{font-size:.82rem; padding:.5rem .4rem}
+  .board-slot{height:34px; flex-basis:34px}
+  .board-tip{font-size:.68rem; padding-top:2px}
+  .page-foot{font-size:.62rem; margin-top:4px}
+  .game-bar{padding:.3rem .6rem}
+}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s !important; transition-duration:.001s !important}
 }

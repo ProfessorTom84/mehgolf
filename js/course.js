@@ -83,10 +83,67 @@
     "Wear sensible shoes and bring a spare ball."
   ];
 
-  /** Seeded one-line description for a course. */
+  const BLURB_D = [
+    "The signature hole is the seventh, for reasons nobody will explain",
+    "The clubhouse is a shed with ambitions",
+    "There is a bell on the twelfth. Ring it and someone will appear",
+    "A former champion still walks the back nine, allegedly",
+    "The course record has stood since 1968 and is widely disbelieved",
+    "One bunker has never been raked and is now a listed feature",
+    "The groundskeeper answers to no one",
+    "Members speak of the fourth green only in whispers",
+    "The scorecards are printed with a deliberate error nobody has corrected",
+    "Wildlife has the run of the place after four o'clock",
+    "There is a tree on the ninth older than the sport",
+    "The eighteenth was moved twice and improved neither time",
+    "Nobody has ever finished under par and left quietly",
+    "The pond has claimed more balls than the rough, which is saying something",
+    "A plaque near the tenth marks something the club would rather forget",
+    "Two holes are widely believed to be the same hole"
+  ];
+
+  const MOTTOS = [
+    "Aim well. Expect little.",
+    "Every stroke counts, unfortunately.",
+    "The wind giveth.",
+    "Play it as it lies, and lie about it later.",
+    "Patience, then arithmetic.",
+    "We have seen worse. Rarely.",
+    "Straight is a direction, not a promise.",
+    "In sand we trust, for want of options.",
+    "Slow play, faster excuses.",
+    "The course always wins. Come anyway.",
+    "Hit it, find it, hit it again.",
+    "Dignity optional.",
+    "Better players have wept here.",
+    "Not the hardest course. Not the fairest either.",
+    "Founded on optimism, sustained by denial.",
+    "A good walk, occasionally spoiled."
+  ];
+
+  /** Seeded three-sentence description for a course. */
   function courseBlurb(seed) {
     const r = rngFor(seed + "|blurb");
     return `${pick(r, BLURB_A)}. ${pick(r, BLURB_B)}. ${pick(r, BLURB_C)}`;
+  }
+
+  /**
+   * The full record for a course that has never existed: name, founding year,
+   * a short history, a piece of local colour and the club motto. All seeded, so
+   * a given code always tells the same story.
+   */
+  function courseCard(seed) {
+    const r = rngFor(seed + "|card");
+    const rb = rngFor(seed + "|blurb");
+    return {
+      name: courseName(seed),
+      est: 1890 + ((r() * 86) | 0),
+      history: `${pick(rb, BLURB_A)}.`,
+      known: `${pick(rb, BLURB_B)}.`,
+      warning: pick(rb, BLURB_C),
+      colour: `${pick(r, BLURB_D)}.`,
+      motto: pick(r, MOTTOS)
+    };
   }
 
   function inB(g, x, y) { return x >= 0 && y >= 0 && x < g.cols && y < g.rows; }
@@ -433,11 +490,22 @@
       g.hills.push({ x: x0, y: y0, n, kind });
     }
 
-    // Keep the cup and tee themselves clean.
+    // The green stays clean around the cup.
     cell(g, hole.x, hole.y).t = T.FAIR; cell(g, hole.x, hole.y).slope = -1;
-    const tc = cell(g, tee.x, tee.y);
-    if (tc.t === T.TREE || tc.t === T.WATER) tc.t = T.ROUGH;
-    tc.slope = -1;
+
+    /* A proper mown TEE BOX. Previously the tee sat on plain rough, so the
+     * opening shot of every hole got no help at all. A teeing ground is cut
+     * grass, so it counts as fairway: the drive runs a dot further and clears
+     * trees, which is exactly how a tee shot ought to feel. */
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = tee.x + dx, y = tee.y + dy;
+        if (!inB(g, x, y)) continue;
+        if (Math.abs(dx) + Math.abs(dy) > 1 && rng() < 0.4) continue;   // ragged edge
+        const c = cell(g, x, y);
+        c.t = T.FAIR; c.slope = -1; c.tree = 0; c.hill = 0;
+      }
+    }
 
     if (!reachable(g, tee, hole)) return null;
     if (onRay(tee, hole)) return null;
@@ -480,5 +548,5 @@
     return { seed, size, name: courseName(seed), holes, bigfoot };
   }
 
-  global.Course = { T, DIRS, SIZES, genCourse, genHole, courseName, courseBlurb, cell, inB };
+  global.Course = { T, DIRS, SIZES, genCourse, genHole, courseName, courseBlurb, courseCard, cell, inB };
 })(window);

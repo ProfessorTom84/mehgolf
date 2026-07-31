@@ -180,15 +180,32 @@
     d.text(M, 124, 11, "Course: " + course.name + "        Course code: " + course.seed, true);
     d.fillG(0.35);
     d.text(M, 138, 9, "Type that code into the game to play these exact holes on screen.");
-    // the course's invented history, wrapped under the header
-    d.fillG(0.42);
-    let by = 154;
-    wrap(window.Course.courseBlurb(course.seed), 9, PW - M * 2).forEach(ln => {
-      d.text(M, by, 9, ln); by += 11;
+
+    /* The course record, boxed like a club plaque. */
+    const cc = window.Course.courseCard(course.seed);
+    const cardY = 150, cardW = PW - M * 2;
+    d.strokeG(0.45); d.lw(1);
+    let by = cardY + 16;
+    d.fillG(0.45);
+    d.text(M + 10, by, 7.5, "ESTABLISHED " + cc.est, true);
+    by += 14;
+    d.fillG(0.1);
+    wrap(`${cc.history} ${cc.known} ${cc.warning}`, 9, cardW - 20).forEach(ln => {
+      d.text(M + 10, by, 9, ln); by += 11;
     });
+    by += 3;
+    d.fillG(0.4);
+    wrap(cc.colour, 8.5, cardW - 20).forEach(ln => { d.text(M + 10, by, 8.5, ln); by += 10; });
+    by += 4;
+    d.fillG(0.05);
+    d.text(M + 10, by, 9.5, '"' + cc.motto + '"', true);
+    by += 8;
+    d.strokeG(0.45); d.lw(1);
+    d.rect(M, cardY, cardW, by - cardY + 4, "S");
+    by += 14;
 
     /* ---------------- left column: how to play ---------------- */
-    let y = 186;
+    let y = Math.max(196, by + 10);
     d.fillG(0.05);
     d.text(L, y, 15, "HOW TO PLAY", true); y += 8;
     d.strokeG(0.05); d.lw(1.2); d.line(L, y, L + colW, y); y += 18;
@@ -202,10 +219,10 @@
     ];
     steps.forEach(([head, body]) => {
       d.fillG(0.05);
-      d.text(L, y, 11, head, true); y += 13;
+      d.text(L, y, 10.5, head, true); y += 12;
       d.fillG(0.25);
-      wrap(body, 9.5, colW).forEach(ln => { d.text(L + 8, y, 9.5, ln); y += 11.5; });
-      y += 7;
+      wrap(body, 9, colW).forEach(ln => { d.text(L + 8, y, 9, ln); y += 10.4; });
+      y += 5;
     });
 
     y += 4;
@@ -221,12 +238,12 @@
     rules.forEach(r => {
       d.fillG(0.05); d.circle(L + 3, y - 3, 2);
       d.fillG(0.25);
-      wrap(r, 9.5, colW - 12).forEach((ln, i) => { d.text(L + 12, y, 9.5, ln); y += 11.5; });
-      y += 5;
+      wrap(r, 9, colW - 12).forEach((ln, i) => { d.text(L + 12, y, 9, ln); y += 10.4; });
+      y += 4;
     });
 
     /* ---------------- right column: map key ---------------- */
-    let ry = 186;
+    let ry = Math.max(196, by + 10);
     d.fillG(0.05);
     d.text(R, ry, 15, "MAP KEY", true); ry += 8;
     d.strokeG(0.05); d.line(R, ry, R + colW, ry); ry += 20;

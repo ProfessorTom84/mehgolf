@@ -54,6 +54,7 @@
     }
   };
   const theme = () => PALETTES[S.theme] || PALETTES.ink;
+  const coarse = () => window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   const P = () => S.ps[S.cur];
   const terrainAt = p => cell(g(), p.x, p.y).t;
   const isHole = p => p.x === g().hole.x && p.y === g().hole.y;
@@ -325,24 +326,29 @@
     // Nothing but a real viewport change (or a fresh board) may trigger a
     // resize. This makes it structurally impossible for hover text, the shot
     // history growing, or any other DOM update to nudge the board's size.
-    if (!force && window.innerWidth === lastFitW && window.innerHeight === lastFitH) return;
-    lastFitW = window.innerWidth; lastFitH = window.innerHeight;
+    const vpH = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    const vpW = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+    if (!force && vpW === lastFitW && vpH === lastFitH) return;
+    lastFitW = vpW; lastFitH = vpH;
     const vw = Number(svg.dataset.vw), vh = Number(svg.dataset.vh);
     if (!vw || !vh) return;
 
-    const stacked = window.innerWidth <= 980;
+    // Matches the CSS: narrow screens stack, but a short wide one (a phone held
+    // sideways) keeps its columns and fits the board to the height.
+    const shortWide = vpH <= 540 && vpW >= 620;
+    const stacked = vpW <= 980 && !shortWide;
 
     // Horizontal budget: measure what the columns actually leave us rather than
     // guessing with a vw fraction, so the side panels can never squeeze the board
     // off-screen.
     let maxW;
     if (stacked) {
-      maxW = Math.min(window.innerWidth * 0.92, 560);
+      maxW = Math.min(vpW * 0.94, 560);
     } else {
       const felt = document.querySelector(".table-felt");
       const hist = document.querySelector(".side-left");
       const tray = document.querySelector(".side-right");
-      const feltW = felt ? felt.clientWidth : window.innerWidth;
+      const feltW = felt ? felt.clientWidth : vpW;
       const sideW = (hist ? hist.getBoundingClientRect().width : 0)
         + (tray ? tray.getBoundingClientRect().width : 0);
       maxW = Math.min(feltW - sideW - 66, 560); // 66 = column gaps + page padding
@@ -359,7 +365,7 @@
       const n = document.querySelector(sel);
       if (n) belowH += n.getBoundingClientRect().height;
     });
-    const maxH = Math.max(200, window.innerHeight - top - belowH - 24);
+    const maxH = Math.max(200, vpH - top - belowH - 24);
 
     const scale = Math.min(maxW / vw, maxH / vh);
     const w = Math.floor(vw * scale), h = Math.floor(vh * scale);
@@ -393,7 +399,10 @@
   let fitTimer = null;
   const scheduleFit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => fitBoardSettled(false), 80); };
   window.addEventListener("resize", scheduleFit);
-  window.addEventListener("orientationchange", scheduleFit);
+  window.addEventListener("orientationchange", () => setTimeout(() => fitBoardSettled(true), 220));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", scheduleFit);
+  }
   // NOTE: deliberately no ResizeObserver here. Observing the layout that
   // contains the board means our own resize retriggers the observer, which
   // oscillates the board size. The side panels are fixed-width and scroll
@@ -542,15 +551,23 @@
        * reads as terrain. Each aim target is a solid disc in the player's own
        * colour with a white chevron inside: a different shape language, tied to
        * whoever is shooting, and legible on any terrain underneath. */
-      el("circle", { class: "hit", cx: 0, cy: 0, r: 17 }, grp);   // generous click/tap target
+      // Fingers need a bigger target than a mouse pointer does.
+      const touch = coarse();
+      const HR = touch ? 25 : 17, CR = touch ? 15 : 11, HS = touch ? 1.35 : 1;
+      el("circle", { class: "hit", cx: 0, cy: 0, r: HR }, grp);
       if (r.ok) {
-        el("circle", { class: "chip-sh", cx: 0, cy: 1.5, r: 11 }, grp);          // drop shadow
-        el("circle", { class: "chip", cx: 0, cy: 0, r: 11, fill: p.color }, grp);
-        el("polygon", { class: "head", points: "0,-5.5 4.6,2.4 0,0.4 -4.6,2.4" }, grp);
+        el("circle", { class: "chip-sh", cx: 0, cy: 1.5, r: CR }, grp);          // drop shadow
+        el("circle", { class: "chip", cx: 0, cy: 0, r: CR, fill: p.color }, grp);
+        el("polygon", {
+          class: "head",
+          points: [[0, -5.5], [4.6, 2.4], [0, 0.4], [-4.6, 2.4]]
+            .map(q => `${(q[0] * HS).toFixed(2)},${(q[1] * HS).toFixed(2)}`).join(" ")
+        }, grp);
       } else {
-        el("circle", { class: "chip blocked-chip", cx: 0, cy: 0, r: 9 }, grp);
-        el("line", { class: "no1", x1: -4, y1: -4, x2: 4, y2: 4 }, grp);
-        el("line", { class: "no1", x1: 4, y1: -4, x2: -4, y2: 4 }, grp);
+        el("circle", { class: "chip blocked-chip", cx: 0, cy: 0, r: CR * 0.82 }, grp);
+        const k = 4 * HS;
+        el("line", { class: "no1", x1: -k, y1: -k, x2: k, y2: k }, grp);
+        el("line", { class: "no1", x1: k, y1: -k, x2: -k, y2: k }, grp);
       }
       el("title", {}, grp).textContent = r.ok ? `Hit ${n} this way` : (r.reason || "blocked");
       if (r.ok) {
@@ -1008,7 +1025,12 @@
     const box = $("#scorecard-inline");
     if (!box) return;
     const ps = S.ps;
-    let html = `<table class="sc-table"><thead><tr><th>Hole</th>` +
+    const cc = window.Course.courseCard(S.seed);
+    let html = `<div class="sc-head">` +
+      `<b>${cc.name}</b> <span class="cb-est">est. ${cc.est}</span>` +
+      `<p class="sc-motto">&ldquo;${cc.motto}&rdquo;</p>` +
+      `<p class="sc-colour">${cc.colour}</p></div>` +
+      `<table class="sc-table"><thead><tr><th>Hole</th>` +
       ps.map(p => `<th style="color:${p.color}">${p.name.slice(0, 4)}</th>`).join("") +
       `</tr></thead><tbody>`;
     for (let h = 0; h < 18; h++) {
@@ -1082,20 +1104,32 @@
     const tip = $("#board-tip");
     if (!tip) return;
     let cur = "";
-    svg.addEventListener("mousemove", e => {
+
+    /** Describe whatever square is under this screen point. */
+    function inspectAt(clientX, clientY, force) {
       const pt = svg.getBoundingClientRect();
-      const sx = (e.clientX - pt.left) / pt.width * (Number(svg.dataset.vw) || 1);
-      const sy = (e.clientY - pt.top) / pt.height * (Number(svg.dataset.vh) || 1);
+      const sx = (clientX - pt.left) / pt.width * (Number(svg.dataset.vw) || 1);
+      const sy = (clientY - pt.top) / pt.height * (Number(svg.dataset.vh) || 1);
       const x = Math.floor(sx / C), y = Math.floor(sy / C);
       const info = describeCell(x, y);
       const key = info ? x + "," + y : "";
-      if (key === cur) return;
+      if (key === cur && !force) return;
       cur = key;
       if (!info) { tip.classList.add("hidden"); return; }
       tip.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`;
       tip.classList.remove("hidden");
-    });
-    svg.addEventListener("mouseleave", () => { cur = ""; $("#board-tip").classList.add("hidden"); });
+    }
+
+    svg.addEventListener("mousemove", e => inspectAt(e.clientX, e.clientY));
+    svg.addEventListener("mouseleave", () => { cur = ""; tip.classList.add("hidden"); });
+
+    /* Touch has no hover, so a tap on the board reads out the square instead.
+     * Taps that land on an aim target are left alone -- those take the shot. */
+    svg.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse") return;
+      if (e.target.closest && e.target.closest(".aim-arrow")) return;
+      inspectAt(e.clientX, e.clientY, true);
+    }, { passive: true });
   }
 
   /* ---------------- caddie chatter ---------------- */
@@ -1594,13 +1628,33 @@
     }
   }
 
+  /** Opening titles: the course introduces itself before the first tee shot. */
+  function showCourseCard(onDone) {
+    const c = window.Course.courseCard(S.seed);
+    banner(
+      `<div class="course-card">
+         <div class="cc-est">Established ${c.est}</div>
+         <h2 class="cc-name">${c.name}</h2>
+         <div class="cc-rule"></div>
+         <p class="cc-hist">${c.history} ${c.known} ${c.warning}</p>
+         <p class="cc-colour">${c.colour}</p>
+         <p class="cc-motto">&ldquo;${c.motto}&rdquo;</p>
+         <div class="cc-code">Course code ${S.seed} \u00B7 18 holes \u00B7 par 6</div>
+       </div>`,
+      "Play the first hole",
+      () => { hideBanner(); if (onDone) onDone(); },
+      false);
+  }
+
   /** Show the made-up history of whatever course code is currently typed in. */
   function refreshBlurb() {
     const box = $("#course-blurb"), inp = $("#seed-input");
     if (!box || !inp) return;
     const code = inp.value.replace(/[^0-9]/g, "").slice(0, 10);
     if (!code) { box.textContent = ""; return; }
-    box.textContent = `${window.Course.courseName(code)} \u2014 ${window.Course.courseBlurb(code)}`;
+    const c = window.Course.courseCard(code);
+    box.innerHTML = `<b>${c.name}</b> <span class="cb-est">est. ${c.est}</span><br>` +
+      `${c.history} ${c.known} ${c.warning}<br><i>&ldquo;${c.motto}&rdquo;</i>`;
   }
 
   /* ---------------- menu / boot ---------------- */
@@ -1643,6 +1697,9 @@
     $("#game").classList.remove("hidden");
     SFX.page();
     setupHole();
+    // Hold play until the course has introduced itself.
+    S.phase = "between"; renderControls();
+    showCourseCard(() => { S.phase = "roll"; renderControls(); updateTurnCard(); });
   }
 
   function showMenu() {

@@ -17,6 +17,7 @@ No build step, no npm, no CDN calls. You can also just open `index.html` directl
 - **Shot history** — a running log beside the board records every shot: the die face, the terrain modifier, distance, direction, and where the ball ended up. In multiplayer each line is tagged with the player's name and color.
 - **Legend & scorecard** — always visible beside the board, no pop-ups: the map key sits under the shot history, the live scorecard under the turn card.
 - **Hills** — small squares of arrows, 2×2 to 4×4. Solid arrows are a mound (roll 1 dot away from the middle); open arrows are a hollow (roll 1 dot toward it). Laid only on clear rough, so they never overlap other terrain, and rolls chain across anything they meet.
+- **Mobile** — plays on iPhone and iPad: `dvh` sizing so iOS Safari's URL bar can't clip the board, safe-area padding for the notch, 44pt touch targets, larger aim chips on touch, tap-to-inspect any square (touch has no hover), and a side-by-side layout when a phone is held sideways.
 - **Breeze** — trees sway and water shimmers, each on its own seeded phase (disabled under `prefers-reduced-motion`).
 - **Seeded courses** — the numeric seed code deterministically generates all 18 holes (terrain, slopes, even where the bigfoot hides). Share a seed to play identical courses on different machines.
 - **Two rule sets** — Dice golf (roll a d6; fairway +1, sand −1) and Speed golf (driver 6 / iron 3 / putter 1).
