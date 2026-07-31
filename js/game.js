@@ -1000,6 +1000,60 @@
         c.appendChild(hint);
       }
     }
+
+    if (S.phase === "aim") {
+      const dpad = document.createElement("div");
+      dpad.className = "aim-dpad";
+      dpad.style.display = "grid";
+      dpad.style.gridTemplateColumns = "repeat(3, 1fr)";
+      dpad.style.gap = "0.3rem";
+      dpad.style.marginTop = "0.6rem";
+      dpad.style.maxWidth = "200px";
+      dpad.style.marginLeft = "auto";
+      dpad.style.marginRight = "auto";
+
+      const layout = [7, 0, 1, 6, -1, 2, 5, 4, 3];
+      const arrows = ["↖", "↑", "↗", "←", "○", "→", "↙", "↓", "↘"];
+      const results = legalDirs(p.pos, S.moveN, S.moveKind);
+
+      layout.forEach((dirIdx, cellIdx) => {
+        if (dirIdx === -1) {
+          const centerCell = document.createElement("div");
+          centerCell.className = "dpad-center";
+          centerCell.innerHTML = arrows[cellIdx];
+          centerCell.style.display = "grid";
+          centerCell.style.placeItems = "center";
+          centerCell.style.fontSize = "1.2rem";
+          centerCell.style.fontWeight = "bold";
+          centerCell.style.color = p.color;
+          centerCell.style.border = "2px dashed " + p.color;
+          centerCell.style.borderRadius = "8px";
+          centerCell.style.background = "var(--paper)";
+          dpad.appendChild(centerCell);
+        } else {
+          const r = results[dirIdx];
+          const btnDir = document.createElement("button");
+          btnDir.className = "btn dpad-btn" + (r.ok ? "" : " disabled");
+          btnDir.innerHTML = arrows[cellIdx];
+          btnDir.disabled = !r.ok;
+          btnDir.style.padding = "0.5rem";
+          btnDir.style.fontSize = "1.2rem";
+          btnDir.style.display = "grid";
+          btnDir.style.placeItems = "center";
+          btnDir.title = r.ok ? `Hit ${S.moveN} ${arrows[cellIdx]}` : (r.reason || "blocked");
+
+          if (r.ok) {
+            btnDir.addEventListener("mouseenter", () => preview(p.pos, r));
+            btnDir.addEventListener("mouseleave", () => { $("#preview").innerHTML = ""; });
+            btnDir.addEventListener("focus", () => preview(p.pos, r));
+            btnDir.addEventListener("blur", () => { $("#preview").innerHTML = ""; });
+            btnDir.addEventListener("click", () => commitMove(r, S.moveKind));
+          }
+          dpad.appendChild(btnDir);
+        }
+      });
+      c.appendChild(dpad);
+    }
   }
   function markClub(row, i) {
     [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
@@ -1144,12 +1198,36 @@
       const key = info ? x + "," + y : "";
       if (key === cur && !force) return;
       cur = key;
-      if (!info) { tip.classList.add("hidden"); return; }
+      if (!info) {
+        tip.classList.add("hidden");
+        const t = document.querySelector(".inspect-toast");
+        if (t) t.remove();
+        return;
+      }
       tip.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`;
       tip.classList.remove("hidden");
       if (phoneQ()) {                       // it floats over the board and fades
         clearTimeout(tipTimer);
-        tipTimer = setTimeout(() => { cur = ""; tip.classList.add("hidden"); }, 2600);
+        let toast = document.querySelector(".inspect-toast");
+        if (!toast) {
+          toast = document.createElement("div");
+          toast.className = "inspect-toast";
+          const wrap = $("#board-wrap");
+          if (wrap) wrap.appendChild(toast);
+        }
+        toast.innerHTML = `<b>${info[0]}</b><p>${info[1]}</p>`;
+        toast.style.display = "block";
+        toast.style.opacity = "1";
+
+        tipTimer = setTimeout(() => {
+          cur = "";
+          tip.classList.add("hidden");
+          const t = document.querySelector(".inspect-toast");
+          if (t) {
+            t.style.opacity = "0";
+            setTimeout(() => { if (t.parentNode) t.remove(); }, 250);
+          }
+        }, 2600);
       }
     }
     let tipTimer = null;
