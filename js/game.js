@@ -1723,6 +1723,19 @@
    */
   function syncLayout() {
     const sheet = $("#sheet");
+    if (sheet && !document.getElementById("sheet-close-btn")) {
+      const closeBtn = document.createElement("button");
+      closeBtn.id = "sheet-close-btn";
+      closeBtn.className = "btn primary big";
+      closeBtn.innerHTML = "&times; Close & Back to Game";
+      closeBtn.style.marginBottom = "0.8rem";
+      closeBtn.style.zIndex = "100";
+      closeBtn.addEventListener("click", () => {
+        document.body.classList.remove("sheet-open");
+        SFX.page();
+      });
+      sheet.insertBefore(closeBtn, sheet.firstChild);
+    }
     if (sheet && !document.getElementById("sheet-tools")) {
       const t = document.createElement("div");
       t.id = "sheet-tools"; t.className = "sheet-tools";
@@ -1782,8 +1795,10 @@
     renderHistory();
     renderLegend();
     renderScorecard();
+    const inputs = document.querySelectorAll(".player-name-input");
+    const customNames = Array.from(inputs).map((inp, i) => inp.value.trim() || inp.placeholder);
     S.ps = Array.from({ length: S.players }, (_, i) => ({
-      name: S.players === 1 ? "You" : PNAMES[i],
+      name: customNames[i] || (S.players === 1 ? "You" : PNAMES[i]),
       color: PCOLORS[i],
       pos: { x: 0, y: 0 }, strokes: 0, holed: false,
       mulligans: 6, teeRerollUsed: false, trail: [],
@@ -1806,6 +1821,46 @@
     $("#menu").classList.remove("hidden");
   }
 
+  function updatePlayerNameInputs() {
+    const container = $("#player-names-container");
+    if (!container) return;
+    container.innerHTML = "";
+    const count = S.players;
+    for (let i = 0; i < count; i++) {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "0.4rem";
+
+      const dot = document.createElement("span");
+      dot.style.width = "12px";
+      dot.style.height = "12px";
+      dot.style.borderRadius = "50%";
+      dot.style.background = PCOLORS[i];
+      dot.style.display = "inline-block";
+      dot.style.boxShadow = "1px 1px 0 var(--ink)";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "player-name-input";
+      input.dataset.index = i;
+      input.style.flex = "1";
+      input.maxLength = 15;
+      input.placeholder = count === 1 ? "You" : PNAMES[i];
+      input.value = count === 1 ? "You" : PNAMES[i];
+      input.style.fontFamily = "inherit";
+      input.style.fontSize = "0.92rem";
+      input.style.padding = "0.3rem 0.5rem";
+      input.style.border = "2px solid var(--ink)";
+      input.style.borderRadius = "6px";
+      input.style.background = "#fff";
+
+      row.appendChild(dot);
+      row.appendChild(input);
+      container.appendChild(row);
+    }
+  }
+
   function wireMenu() {
     $("#seed-input").value = RNG.randSeedCode();
     $("#shuffle-seed").addEventListener("click", () => {
@@ -1819,6 +1874,7 @@
       $("#size-hint").textContent = S.players === 1
         ? "Solo \u2192 pocket notebook (14\u00D720)"
         : `${S.players} players \u2192 XL notebook (18\u00D726), pass-and-play`;
+      updatePlayerNameInputs();
     });
     $("#mode-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
@@ -1845,6 +1901,7 @@
     const toggleMute = () => { SFX.setMuted(!SFX.isMuted()); syncMute(); };
     $("#mute-btn").addEventListener("click", toggleMute);
     $("#mute-btn2").addEventListener("click", toggleMute);
+    syncMute();
 
     $("#exit-btn").addEventListener("click", () => {
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
@@ -1862,6 +1919,7 @@
     syncLayout();
     window.addEventListener("resize", () => { clearTimeout(window.__lay); window.__lay = setTimeout(syncLayout, 120); });
     refreshBlurb();
+    updatePlayerNameInputs();
 
     $("#theme-picker").addEventListener("click", e => {
       const b = e.target.closest("button");
@@ -1885,7 +1943,127 @@
       SFX.page();
     });
     document.addEventListener("keydown", e => {
-      if (e.key === "Escape") $("#modal").classList.add("hidden");
+      if (e.key === "Escape") {
+        $("#modal").classList.add("hidden");
+        return;
+      }
+
+      // Check if we are on the game screen and no modal or banner is open
+      const gameHidden = $("#game").classList.contains("hidden");
+      const modalHidden = $("#modal").classList.contains("hidden");
+      const bannerHidden = $("#banner").classList.contains("hidden");
+      if (gameHidden || !modalHidden || !bannerHidden) return;
+
+      // Ignore inputs if user is typing in a text field
+      if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) return;
+
+      const p = P();
+      if (!p) return;
+
+      // 1. Roll / Primary action (Space, Enter, R)
+      if (e.key === " " || e.key === "Enter" || e.key === "r" || e.key === "R") {
+        if (S.phase === "roll") {
+          e.preventDefault();
+          doRoll();
+          return;
+        } else if (S.phase === "rolled" || S.phase === "aim") {
+          if (S.moveKind === "putt") {
+            e.preventDefault();
+            const rollN = S.rollMoveN || S.moveN;
+            enterAim(rollN, "roll");
+            renderControls();
+            return;
+          }
+        }
+      }
+
+      // 2. Putt (P)
+      if (e.key === "p" || e.key === "P") {
+        if (S.mode === "dice" && (S.phase === "rolled" || S.phase === "aim")) {
+          e.preventDefault();
+          const rollN = S.rollMoveN || S.moveN;
+          if (S.moveKind === "putt") {
+            enterAim(rollN, "roll");
+          } else {
+            enterAim(1, "putt");
+          }
+          renderControls();
+          return;
+        }
+      }
+
+      // 3. Mulligan (M)
+      if (e.key === "m" || e.key === "M") {
+        if (S.mode === "dice" && (S.phase === "rolled" || S.phase === "aim")) {
+          e.preventDefault();
+          if (p.mulligans > 0) {
+            p.mulligans--;
+            updateMulligans();
+            doRoll();
+          } else {
+            SFX.nope();
+          }
+          return;
+        }
+      }
+
+      // 4. Tee re-roll (T)
+      if (e.key === "t" || e.key === "T") {
+        if (S.mode === "dice" && (S.phase === "rolled" || S.phase === "aim")) {
+          e.preventDefault();
+          const isTee = p.strokes === 0;
+          if (isTee && !p.teeRerollUsed) {
+            p.teeRerollUsed = true;
+            doRoll();
+          } else {
+            SFX.nope();
+          }
+          return;
+        }
+      }
+
+      // 5. Aim directions (1-8 keys, Numpad directions, Arrow keys, WASD)
+      if (S.phase === "aim") {
+        let dirIdx = -1;
+
+        // Map numpad keys (1-4, 6-9)
+        if (e.code === "Numpad8") dirIdx = 0;
+        else if (e.code === "Numpad9") dirIdx = 1;
+        else if (e.code === "Numpad6") dirIdx = 2;
+        else if (e.code === "Numpad3") dirIdx = 3;
+        else if (e.code === "Numpad2") dirIdx = 4;
+        else if (e.code === "Numpad1") dirIdx = 5;
+        else if (e.code === "Numpad4") dirIdx = 6;
+        else if (e.code === "Numpad7") dirIdx = 7;
+
+        // Map standard keys 1-8 clockwise (1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W, 8=NW)
+        else if (e.key === "1") dirIdx = 0;
+        else if (e.key === "2") dirIdx = 1;
+        else if (e.key === "3") dirIdx = 2;
+        else if (e.key === "4") dirIdx = 3;
+        else if (e.key === "5") dirIdx = 4;
+        else if (e.key === "6") dirIdx = 5;
+        else if (e.key === "7") dirIdx = 6;
+        else if (e.key === "8") dirIdx = 7;
+
+        // Map WASD or Arrow Keys
+        else if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") dirIdx = 0;
+        else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dirIdx = 2;
+        else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") dirIdx = 4;
+        else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") dirIdx = 6;
+
+        if (dirIdx >= 0 && dirIdx < 8) {
+          e.preventDefault();
+          const results = legalDirs(p.pos, S.moveN, S.moveKind);
+          const r = results[dirIdx];
+          if (r && r.ok) {
+            commitMove(r, S.moveKind);
+          } else {
+            SFX.nope();
+            msg(`Not that way \u2014 ${r ? r.reason : "blocked"}.`);
+          }
+        }
+      }
     });
   }
 

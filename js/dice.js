@@ -69,8 +69,37 @@
       const hop = calm ? 18 : 90 + Math.random() * 50;
 
       let start = null, ticked = new Set();
+      let skipped = false;
+      let frameId = null;
+
+      stage.style.pointerEvents = "auto";
+      const skip = () => {
+        if (skipped) return;
+        skipped = true;
+        if (frameId) cancelAnimationFrame(frameId);
+        stage.removeEventListener("click", skip);
+
+        die.style.transform =
+          `translate(${x1 - 27}px, ${y1 - 27}px) rotateX(${endRX}deg) rotateY(${endRY}deg)`;
+        shadow.style.transform = `translate(${x1 - 27}px, ${y1 + 22}px) scale(1)`;
+        shadow.style.opacity = "0.7";
+        SFX.diceTick(0, 0.3);                        // final settle
+
+        setTimeout(() => {
+          die.style.transition = "opacity .2s"; shadow.style.transition = "opacity .2s";
+          die.style.opacity = "0"; shadow.style.opacity = "0";
+          setTimeout(() => {
+            stage.innerHTML = "";
+            stage.style.pointerEvents = "";
+            resolve();
+          }, 200);
+        }, 300);
+      };
+
+      stage.addEventListener("click", skip);
 
       function frame(ts) {
+        if (skipped) return;
         if (!start) start = ts;
         const el = ts - start;
 
@@ -89,7 +118,7 @@
             `translate(${x - 27}px, ${y - 27 - b}px) rotateX(${endRX * e}deg) rotateY(${endRY * e}deg)`;
           shadow.style.transform = `translate(${x - 27}px, ${y + 22}px) scale(${1 - b / 260})`;
           shadow.style.opacity = String(0.7 - b / 300);
-          requestAnimationFrame(frame);
+          frameId = requestAnimationFrame(frame);
         } else {
           // pin to the exact final orientation (guards against float drift)
           die.style.transform =
@@ -97,14 +126,19 @@
           shadow.style.transform = `translate(${x1 - 27}px, ${y1 + 22}px) scale(1)`;
           shadow.style.opacity = "0.7";
           SFX.diceTick(0, 0.3);                        // final settle
+          stage.removeEventListener("click", skip);
           setTimeout(() => {
             die.style.transition = "opacity .35s"; shadow.style.transition = "opacity .35s";
             die.style.opacity = "0"; shadow.style.opacity = "0";
-            setTimeout(() => { stage.innerHTML = ""; resolve(); }, 380);
+            setTimeout(() => {
+              stage.innerHTML = "";
+              stage.style.pointerEvents = "";
+              resolve();
+            }, 380);
           }, 700);
         }
       }
-      requestAnimationFrame(frame);
+      frameId = requestAnimationFrame(frame);
     });
   }
 
