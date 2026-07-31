@@ -191,4 +191,45 @@
   };
 
   global.SFX = SFX;
+
+  // Global user-gesture interaction unlocker for reliable Web Audio on iOS/Safari/Android
+  function initUnlocker() {
+    const unlock = () => {
+      const c = ensure();
+      if (c) {
+        if (c.state === "suspended") {
+          c.resume().then(() => {
+            const events = ["click", "touchstart", "touchend", "keydown"];
+            events.forEach(e => document.removeEventListener(e, unlock));
+          }).catch(e => {
+            // ignore
+          });
+        } else if (c.state === "running") {
+          const events = ["click", "touchstart", "touchend", "keydown"];
+          events.forEach(e => document.removeEventListener(e, unlock));
+        }
+
+        // Also play a short silent buffer to force-unlock iOS Audio Graph
+        try {
+          const buffer = c.createBuffer(1, 1, 22050);
+          const source = c.createBufferSource();
+          source.buffer = buffer;
+          source.connect(c.destination);
+          source.start(0);
+        } catch (e) {
+          // safe catch
+        }
+      }
+    };
+    const events = ["click", "touchstart", "touchend", "keydown"];
+    events.forEach(e => document.addEventListener(e, unlock, { passive: true }));
+  }
+
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initUnlocker);
+    } else {
+      initUnlocker();
+    }
+  }
 })(window);

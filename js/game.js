@@ -343,7 +343,7 @@
     // off-screen.
     let maxW;
     if (stacked) {
-      maxW = Math.min(vpW * 0.94, 560);
+      maxW = Math.min(vpW * 0.98, 560);
     } else {
       const felt = document.querySelector(".table-felt");
       const hist = document.querySelector(".side-left");
