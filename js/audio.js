@@ -3,6 +3,11 @@
   "use strict";
 
   let ctx = null, master = null, muted = false;
+  try {
+    muted = localStorage.getItem("mehgolf.muted") === "true";
+  } catch (e) {
+    // safe fallback
+  }
 
   function ensure() {
     if (!ctx) {
@@ -85,6 +90,16 @@
 
   const rnd = (a, b) => a + Math.random() * (b - a);
 
+  function vibrate(pattern) {
+    if (typeof navigator !== "undefined" && navigator.vibrate && !muted) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (e) {
+        // Safe catch-all
+      }
+    }
+  }
+
   const SFX = {
     /**
      * A die tumbling on paper. Every clatter is a fresh roll of pitch,
@@ -100,6 +115,9 @@
         crack(rnd(2200, 4200), rnd(700, 1400), rnd(0.012, 0.026), 0.06 + f * 0.09,
               (when || 0) + rnd(0.012, 0.03), 2.4);
       }
+      if (!when || when === 0) {
+        vibrate(10);
+      }
     },
 
     /**
@@ -114,12 +132,14 @@
       thump(rnd(1500, 2100), rnd(300, 460), 0.05, "triangle", 0.2 * v, 0.001); // metallic ping
       thump(rnd(120, 175), rnd(55, 80), heavy ? 0.16 : 0.11, "sine", 0.36 * v, 0.002); // body
       crack(rnd(700, 1000), 200, 0.07, 0.09 * v, 0.004, 0.7);            // air
+      vibrate(heavy ? 40 : 30);
     },
 
     /** Putter: softer, duller, no ping. */
     putt() {
       crack(rnd(1800, 2600), rnd(500, 800), 0.018, 0.16, 0, 1.1);
       thump(rnd(210, 280), rnd(90, 130), 0.09, "sine", 0.22, 0.001);
+      vibrate(15);
     },
 
     /** Iron: between the two, with a shorter ring. */
@@ -127,6 +147,7 @@
       crack(rnd(3200, 4600), rnd(800, 1200), 0.02, 0.26, 0, 1.0);
       thump(rnd(1100, 1500), rnd(280, 400), 0.04, "triangle", 0.14, 0.001);
       thump(rnd(150, 200), rnd(70, 95), 0.12, "sine", 0.3, 0.002);
+      vibrate(25);
     },
     /** rolling down a slope */
     slope() {
@@ -134,6 +155,7 @@
       for (let i = 0; i < n; i++) {
         crack(rnd(900, 1500) - i * 90, rnd(300, 500), rnd(0.02, 0.04), rnd(0.07, 0.14), i * rnd(0.05, 0.09), 1.4);
       }
+      vibrate([10, 30, 10]);
     },
     /** ball drops in the cup */
     sink() {
@@ -141,16 +163,30 @@
       blip(880, 0.12, "triangle", 0.35, 0.09);
       blip(1320, 0.25, "triangle", 0.4, 0.18);
       noise(0.05, 800, 0.2, 0.02);
+      vibrate([50, 50, 100, 50, 150]);
     },
     /** page turn */
     page() { noise(0.28, 3000, 0.22); },
     /** invalid choice */
-    nope() { blip(120, 0.12, "square", 0.2); },
+    nope() {
+      blip(120, 0.12, "square", 0.2);
+      vibrate([30, 50, 30]);
+    },
     /** bigfoot spotted */
-    growl() { blip(70, 0.35, "sawtooth", 0.3); blip(55, 0.4, "sawtooth", 0.25, 0.05); },
+    growl() {
+      blip(70, 0.35, "sawtooth", 0.3); blip(55, 0.4, "sawtooth", 0.25, 0.05);
+      vibrate([60, 40, 60]);
+    },
     fanfare() { [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.18, "triangle", 0.32, i * 0.12)); },
     unlock() { ensure(); },
-    setMuted(m) { muted = m; },
+    setMuted(m) {
+      muted = m;
+      try {
+        localStorage.setItem("mehgolf.muted", m);
+      } catch (e) {
+        // safe fallback
+      }
+    },
     isMuted() { return muted; }
   };
 
