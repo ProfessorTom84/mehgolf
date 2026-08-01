@@ -17,6 +17,11 @@
       master = ctx.createGain();
       master.gain.value = 0.5;
       master.connect(ctx.destination);
+      // iOS 16.4+: without this, Web Audio is muted by the phone's physical
+      // ring/silent switch — the #1 reason a game has no sound on iPhone.
+      try {
+        if (navigator.audioSession) navigator.audioSession.type = "playback";
+      } catch (e) { /* unsupported: safe to ignore */ }
     }
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
@@ -91,6 +96,8 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   function vibrate(pattern) {
+    // ponytail: iOS Safari has no Vibration API, so this no-ops on iPhone by
+    // design — there is no web way to trigger haptics there. Works on Android.
     if (typeof navigator !== "undefined" && navigator.vibrate && !muted) {
       try {
         navigator.vibrate(pattern);
