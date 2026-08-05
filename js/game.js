@@ -1626,16 +1626,25 @@
       Array.from({ length: 6 }, (_, i) => `<span class="mull-pip${i < 6 - p.mulligans ? " used" : ""}"></span>`).join("");
   }
 
-  function onBigfoot(e) {
+  function spotBigfoot() {
     if (S.bigfootFound) return;
+    const bf = S.course.bigfoot;
+    if (!bf || bf.hole !== S.holeIdx) return;
     S.bigfootFound = true;
-    e.currentTarget.classList.add("bigfoot-found");
+    const el = $(".bigfoot");
+    if (el) {
+      el.classList.add("bigfoot-found");
+      setTimeout(() => el.style.opacity = "0.2", 600);
+    }
     SFX.growl();
     S.ps.forEach(p => p.mulligans++);
     updateMulligans();
     if (S.phase === "rolled" || S.phase === "aim") renderControls(); // un-disable the mulligan button
     msg("You spotted the bigfoot! Everyone pockets a bonus mulligan.");
-    setTimeout(() => e.currentTarget.style.opacity = "0.2", 600);
+  }
+
+  function onBigfoot(e) {
+    spotBigfoot();
   }
 
   /* ---------------- overlays ---------------- */
@@ -2014,7 +2023,17 @@
         }
       }
 
-      // 3. Mulligan (M)
+      // 3. Spot Bigfoot (B)
+      if (e.key === "b" || e.key === "B") {
+        const bf = S.course.bigfoot;
+        if (bf && bf.hole === S.holeIdx && !S.bigfootFound) {
+          e.preventDefault();
+          spotBigfoot();
+          return;
+        }
+      }
+
+      // 4. Mulligan (M)
       if (e.key === "m" || e.key === "M") {
         if (S.mode === "dice" && (S.phase === "rolled" || S.phase === "aim")) {
           e.preventDefault();
@@ -2029,7 +2048,7 @@
         }
       }
 
-      // 4. Tee re-roll (T)
+      // 5. Tee re-roll (T)
       if (e.key === "t" || e.key === "T") {
         if (S.mode === "dice" && (S.phase === "rolled" || S.phase === "aim")) {
           e.preventDefault();
@@ -2044,7 +2063,7 @@
         }
       }
 
-      // 5. Aim directions (1-8 keys, Numpad directions, Arrow keys, WASD)
+      // 6. Aim directions (1-8 keys, Numpad directions, Arrow keys, WASD)
       if (S.phase === "aim") {
         let dirIdx = -1;
 
