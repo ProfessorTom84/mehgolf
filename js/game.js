@@ -23,6 +23,7 @@
     caddieKey: "", caddieText: "", lastShooter: -1,
     theme: "colour"           // "colour" | "ink"
   };
+  window.S = S;
 
   /* ---------------- helpers ---------------- */
   const g = () => S.course.holes[S.holeIdx];
@@ -836,6 +837,7 @@
     if (S.ps.every(p => p.holed)) return holeComplete();
     nextPlayer();
     startTurn(justHoled);
+    saveGame();
   }
 
   function nextPlayer() {
@@ -905,6 +907,7 @@
     msg(`Rolled ${v}${mod} \u2192 the ball will travel ${n}. Pick a direction${n > 1 ? ", or putt instead" : ""}.`);
     enterAim(n, "roll");
     renderControls();
+    saveGame();
   }
 
   function enterAim(n, kind) {
@@ -926,11 +929,16 @@
         msg(`Even the putt is blocked. Unplayable: +1 stroke, ${S.mode === "dice" ? "roll" : "swing"} again.`);
         P().strokes++;
         updateFoot();
-        if (P().strokes >= STROKE_CAP) return startTurn(); // cap check → forced pickup
+        if (P().strokes >= STROKE_CAP) {
+          startTurn();
+          saveGame();
+          return;
+        }
         S.phase = "roll";
       }
       renderControls();
     }
+    saveGame();
   }
 
   /* ---------------- controls panel ---------------- */
@@ -1555,6 +1563,7 @@
   }
 
   function courseComplete() {
+    clearGameSave();
     hideBanner();
     S.phase = "over";
     SFX.fanfare();
@@ -1584,6 +1593,7 @@
     $("#foot-hole").textContent = `Hole ${S.holeIdx + 1}`;
     updateFoot();
     startTurn();
+    saveGame();
   }
 
   function updateFoot() {
@@ -1641,6 +1651,155 @@
     updateMulligans();
     if (S.phase === "rolled" || S.phase === "aim") renderControls(); // un-disable the mulligan button
     msg("You spotted the bigfoot! Everyone pockets a bonus mulligan.");
+    saveGame();
+  }
+
+  function saveGame() {
+    try {
+      const stateToSave = {
+        seed: S.seed,
+        players: S.players,
+        mode: S.mode,
+        size: S.size,
+        holeIdx: S.holeIdx,
+        ps: S.ps,
+        cur: S.cur,
+        phase: S.phase,
+        rolled: S.rolled,
+        moveN: S.moveN,
+        moveKind: S.moveKind,
+        rollMoveN: S.rollMoveN,
+        bigfootFound: S.bigfootFound,
+        log: S.log,
+        caddieKey: S.caddieKey,
+        caddieText: S.caddieText,
+        lastShooter: S.lastShooter,
+        theme: S.theme
+      };
+      localStorage.setItem("mehgolf.savegame", JSON.stringify(stateToSave));
+    } catch (e) {
+      // safe fallback for private browsing
+    }
+  }
+
+  function clearGameSave() {
+    try {
+      localStorage.removeItem("mehgolf.savegame");
+    } catch (e) {
+      // safe fallback
+    }
+  }
+
+  function checkSaveGame() {
+    let savedData = null;
+    try {
+      const json = localStorage.getItem("mehgolf.savegame");
+      if (json) savedData = JSON.parse(json);
+    } catch (e) {
+      // ignore
+    }
+    const btn = $("#resume-btn");
+    if (btn) {
+      if (savedData) {
+        btn.classList.remove("hidden");
+        btn.textContent = `Resume game (${savedData.players > 1 ? savedData.players + "P" : "1P"} \u00B7 Hole ${savedData.holeIdx + 1})`;
+      } else {
+        btn.classList.add("hidden");
+      }
+    }
+  }
+
+  function resumeGame() {
+    let savedData = null;
+    try {
+      const json = localStorage.getItem("mehgolf.savegame");
+      if (json) savedData = JSON.parse(json);
+    } catch (e) {
+      // ignore
+    }
+    if (!savedData) return;
+
+    S.seed = savedData.seed;
+    S.players = savedData.players;
+    S.mode = savedData.mode;
+    S.size = savedData.size;
+    S.holeIdx = savedData.holeIdx;
+    S.ps = savedData.ps;
+    S.cur = savedData.cur;
+    S.phase = savedData.phase;
+    S.rolled = savedData.rolled;
+    S.moveN = savedData.moveN;
+    S.moveKind = savedData.moveKind;
+    S.rollMoveN = savedData.rollMoveN;
+    S.bigfootFound = savedData.bigfootFound;
+    S.log = savedData.log;
+    S.caddieKey = savedData.caddieKey || "";
+    S.caddieText = savedData.caddieText || "";
+    S.lastShooter = savedData.lastShooter ?? -1;
+    S.theme = savedData.theme || S.theme;
+
+    S.wobble = RNG.rngFor(S.seed + "|wobble" + S.holeIdx);
+    S.course = genCourse(S.seed, S.size);
+    Caddie.init(S.seed);
+
+    applyTheme(S.theme);
+
+    renderHistory();
+    renderLegend();
+    renderScorecard();
+
+    $("#course-name").textContent = S.course.name;
+    $("#course-name").title = window.Course.courseBlurb(S.seed);
+    $("#seed-chip").textContent = S.seed;
+
+    $("#hole-label").textContent = `Hole ${S.holeIdx + 1} / 18`;
+    $("#foot-hole").textContent = `Hole ${S.holeIdx + 1}`;
+
+    $("#menu").classList.add("hidden");
+    $("#game").classList.remove("hidden");
+
+    SFX.page();
+
+    renderBoard();
+    drawTrails();
+    drawBalls();
+    updateFoot();
+    updateTurnCard();
+    updateMulligans();
+
+    const p = P();
+    if (S.caddieText) {
+      const el = $("#caddie");
+      if (el) {
+        el.innerHTML = `<span class="caddie-label">Caddie</span><p>${S.caddieText}</p>`;
+        el.classList.remove("hidden");
+      }
+    } else {
+      const el = $("#caddie");
+      if (el) el.classList.add("hidden");
+    }
+
+    if (S.phase === "roll") {
+      msg(S.mode === "dice" ? `${p.name}, roll the die.` : `${p.name}, pick a club.`);
+    } else if (S.phase === "rolled" || S.phase === "aim") {
+      const fromT = terrainAt(p.pos);
+      const mod = fromT === T.FAIR ? " +1 fairway" : fromT === T.SAND ? " \u22121 sand" : "";
+      if (S.moveKind === "putt") {
+        msg(`Putting \u2192 the ball will travel 1 dot. Pick a direction.`);
+      } else {
+        msg(`Rolled ${S.rolled}${mod} \u2192 the ball will travel ${S.moveN}. Pick a direction${S.moveN > 1 ? ", or putt instead" : ""}.`);
+      }
+      enterAim(S.moveN, S.moveKind);
+    } else if (S.phase === "between" || S.phase === "over") {
+      msg("Hole complete.");
+    } else {
+      S.phase = "roll";
+      msg(S.mode === "dice" ? `${p.name}, roll the die.` : `${p.name}, pick a club.`);
+    }
+
+    renderControls();
+    syncLayout();
+    setTimeout(() => { fitBoardSettled(true); }, 100);
   }
 
   function onBigfoot(e) {
@@ -1815,6 +1974,7 @@
   }
 
   function startGame() {
+    clearGameSave();
     readMenu();
     SFX.unlock();
     S.course = genCourse(S.seed, S.size);
@@ -1844,12 +2004,14 @@
     setupHole();
     // Hold play until the course has introduced itself.
     S.phase = "between"; renderControls();
-    showCourseCard(() => { S.phase = "roll"; renderControls(); updateTurnCard(); });
+    saveGame();
+    showCourseCard(() => { S.phase = "roll"; renderControls(); updateTurnCard(); saveGame(); });
   }
 
   function showMenu() {
     $("#game").classList.add("hidden");
     $("#menu").classList.remove("hidden");
+    checkSaveGame();
   }
 
   function updatePlayerNameInputs() {
@@ -1916,6 +2078,7 @@
         : "No die: choose driver, iron, or putter each shot.";
     });
     $("#start-btn").addEventListener("click", startGame);
+    $("#resume-btn").addEventListener("click", resumeGame);
     $("#pdf-btn").addEventListener("click", () => {
       readMenu();
       const course = genCourse(S.seed, S.size);
@@ -1951,6 +2114,7 @@
     window.addEventListener("resize", () => { clearTimeout(window.__lay); window.__lay = setTimeout(syncLayout, 120); });
     refreshBlurb();
     updatePlayerNameInputs();
+    checkSaveGame();
 
     $("#theme-picker").addEventListener("click", e => {
       const b = e.target.closest("button");
