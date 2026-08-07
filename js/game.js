@@ -1632,9 +1632,27 @@
 
   function updateMulligans() {
     const p = P();
+    const totalMulligans = S.bigfootFound ? 7 : 6;
     $("#mulligan-count").innerHTML = "Mulligans: " +
-      Array.from({ length: 6 }, (_, i) => `<span class="mull-pip${i < 6 - p.mulligans ? " used" : ""}"></span>`).join("");
+      Array.from({ length: totalMulligans }, (_, i) => `<span class="mull-pip${i < totalMulligans - p.mulligans ? " used" : ""}"></span>`).join("");
   }
+
+  // Debug hook for automated verification tests
+  S._test_spotBigfoot = () => {
+    if (S.bigfootFound) return;
+    S.bigfootFound = true;
+    const el = $(".bigfoot");
+    if (el) {
+      el.classList.add("bigfoot-found");
+      setTimeout(() => el.style.opacity = "0.2", 600);
+    }
+    SFX.growl();
+    S.ps.forEach(p => p.mulligans++);
+    updateMulligans();
+    if (S.phase === "rolled" || S.phase === "aim") renderControls();
+    msg("You spotted the bigfoot! Everyone pockets a bonus mulligan.");
+    saveGame();
+  };
 
   function spotBigfoot() {
     if (S.bigfootFound) return;
@@ -1988,6 +2006,9 @@
     renderScorecard();
     const inputs = document.querySelectorAll(".player-name-input");
     const customNames = Array.from(inputs).map((inp, i) => inp.value.trim() || inp.placeholder);
+    try {
+      localStorage.setItem("mehgolf.playernames", JSON.stringify(customNames));
+    } catch (e) {}
     S.ps = Array.from({ length: S.players }, (_, i) => ({
       name: customNames[i] || (S.players === 1 ? "You" : PNAMES[i]),
       color: PCOLORS[i],
@@ -2019,6 +2040,15 @@
     if (!container) return;
     container.innerHTML = "";
     const count = S.players;
+    let savedNames = [];
+    try {
+      const json = localStorage.getItem("mehgolf.playernames");
+      if (json) savedNames = JSON.parse(json);
+    } catch (e) {
+      // safe fallback
+    }
+    if (!Array.isArray(savedNames)) savedNames = [];
+
     for (let i = 0; i < count; i++) {
       const row = document.createElement("div");
       row.style.display = "flex";
@@ -2039,14 +2069,34 @@
       input.dataset.index = i;
       input.style.flex = "1";
       input.maxLength = 15;
-      input.placeholder = count === 1 ? "You" : PNAMES[i];
-      input.value = count === 1 ? "You" : PNAMES[i];
+      const defaultName = count === 1 ? "You" : PNAMES[i];
+      const savedName = (savedNames[i] !== undefined && savedNames[i] !== "") ? savedNames[i] : defaultName;
+      input.placeholder = defaultName;
+      input.value = savedName;
       input.style.fontFamily = "inherit";
       input.style.fontSize = "0.92rem";
       input.style.padding = "0.3rem 0.5rem";
       input.style.border = "2px solid var(--ink)";
       input.style.borderRadius = "6px";
       input.style.background = "#fff";
+
+      // Save name changes immediately to localStorage
+      input.addEventListener("input", () => {
+        const inps = document.querySelectorAll(".player-name-input");
+        let fullNames = [];
+        try {
+          const json = localStorage.getItem("mehgolf.playernames");
+          if (json) fullNames = JSON.parse(json);
+        } catch (e) {}
+        if (!Array.isArray(fullNames)) fullNames = [];
+        inps.forEach(inp => {
+          const idx = parseInt(inp.dataset.index, 10);
+          fullNames[idx] = inp.value.trim();
+        });
+        try {
+          localStorage.setItem("mehgolf.playernames", JSON.stringify(fullNames));
+        } catch (e) {}
+      });
 
       row.appendChild(dot);
       row.appendChild(input);
@@ -2055,6 +2105,37 @@
   }
 
   function wireMenu() {
+    try {
+      const savedPlayers = localStorage.getItem("mehgolf.players");
+      if (savedPlayers) {
+        const playersN = parseInt(savedPlayers, 10);
+        if ([1, 2, 3, 4].includes(playersN)) {
+          S.players = playersN;
+          const btn = document.querySelector(`#player-picker button[data-n="${playersN}"]`);
+          if (btn) {
+            [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === btn));
+          }
+          $("#size-hint").textContent = S.players === 1
+            ? "Solo \u2192 pocket notebook (14\u00D720)"
+            : `${S.players} players \u2192 XL notebook (18\u00D726), pass-and-play`;
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const savedMode = localStorage.getItem("mehgolf.mode");
+      if (savedMode && ["dice", "speed"].includes(savedMode)) {
+        S.mode = savedMode;
+        const btn = document.querySelector(`#mode-picker button[data-m="${savedMode}"]`);
+        if (btn) {
+          [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === btn));
+        }
+        $("#mode-hint").textContent = S.mode === "dice"
+          ? "Roll a die each shot. Fairway +1, sand \u22121."
+          : "No die: choose driver, iron, or putter each shot.";
+      }
+    } catch (e) {}
+
     $("#seed-input").value = RNG.randSeedCode();
     $("#shuffle-seed").addEventListener("click", () => {
       $("#seed-input").value = RNG.randSeedCode(); refreshBlurb();
@@ -2064,6 +2145,9 @@
       const b = e.target.closest("button"); if (!b) return;
       [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === b));
       S.players = +b.dataset.n;
+      try {
+        localStorage.setItem("mehgolf.players", S.players);
+      } catch (e) {}
       $("#size-hint").textContent = S.players === 1
         ? "Solo \u2192 pocket notebook (14\u00D720)"
         : `${S.players} players \u2192 XL notebook (18\u00D726), pass-and-play`;
@@ -2073,6 +2157,9 @@
       const b = e.target.closest("button"); if (!b) return;
       [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === b));
       S.mode = b.dataset.m;
+      try {
+        localStorage.setItem("mehgolf.mode", S.mode);
+      } catch (e) {}
       $("#mode-hint").textContent = S.mode === "dice"
         ? "Roll a die each shot. Fairway +1, sand \u22121."
         : "No die: choose driver, iron, or putter each shot.";
