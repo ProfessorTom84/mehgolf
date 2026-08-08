@@ -1586,12 +1586,52 @@
     S.wobble = RNG.rngFor(S.seed + "|wobble" + S.holeIdx);
     S.ps.forEach(p => {
       p.pos = { ...G.tee }; p.strokes = 0; p.holed = false; p.teeRerollUsed = false; p.trail = [];
+      p.holeStartMulligans = p.mulligans;
     });
     S.cur = 0;
     renderBoard();
     $("#hole-label").textContent = `Hole ${S.holeIdx + 1} / 18`;
     $("#foot-hole").textContent = `Hole ${S.holeIdx + 1}`;
     updateFoot();
+    startTurn();
+    saveGame();
+  }
+
+  function restartHole() {
+    if (!confirm("Are you sure you want to restart the current hole? Your progress on this hole will be lost.")) return;
+
+    // Clear log entries for this hole
+    S.log = S.log.filter(e => e.hole !== S.holeIdx);
+
+    const G = g();
+    S.ps.forEach(p => {
+      p.pos = { ...G.tee };
+      p.strokes = 0;
+      p.holed = false;
+      p.teeRerollUsed = false;
+      p.trail = [];
+      p.scores[S.holeIdx] = null; // Clear scorecard score for current hole
+      if (p.holeStartMulligans !== undefined) {
+        p.mulligans = p.holeStartMulligans;
+      }
+    });
+
+    S.cur = 0;
+    S.phase = "roll"; // Reset phase to roll/club-selection
+
+    const bf = S.course.bigfoot;
+    if (bf && bf.hole === S.holeIdx && S.bigfootFound) {
+      S.bigfootFound = false;
+    }
+
+    SFX.page();
+    renderBoard();
+    renderHistory();
+    renderScorecard();
+    $("#hole-label").textContent = `Hole ${S.holeIdx + 1} / 18`;
+    $("#foot-hole").textContent = `Hole ${S.holeIdx + 1}`;
+    updateFoot();
+    updateMulligans();
     startTurn();
     saveGame();
   }
@@ -1959,9 +1999,9 @@
     if (phoneQ()) {
       if (left.parentNode !== sheet) sheet.appendChild(left);
       if (legend.parentNode !== sheet) sheet.appendChild(legend);
-      // Print & Play / Save / Ink are rarely used mid-round; they were forcing
+      // Print & Play / Save / Ink / Restart are rarely used mid-round; they were forcing
       // the bar onto a second line, so they move into the sheet.
-      if (tools) ["pdf-btn2", "save-btn", "theme-btn"].forEach(id => {
+      if (tools) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== tools) tools.appendChild(b);
       });
@@ -1969,7 +2009,7 @@
       document.body.classList.remove("sheet-open");
       if (left.parentNode !== sheetHome.leftParent) sheetHome.leftParent.insertBefore(left, sheetHome.leftParent.firstChild);
       if (legend.parentNode !== sheetHome.legendParent) sheetHome.legendParent.appendChild(legend);
-      if (acts) ["pdf-btn2", "save-btn", "theme-btn"].forEach(id => {
+      if (acts) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== acts) acts.insertBefore(b, acts.firstChild);
       });
@@ -2164,7 +2204,16 @@
         ? "Roll a die each shot. Fairway +1, sand \u22121."
         : "No die: choose driver, iron, or putter each shot.";
     });
-    $("#start-btn").addEventListener("click", startGame);
+    $("#start-btn").addEventListener("click", () => {
+      try {
+        if (localStorage.getItem("mehgolf.savegame")) {
+          if (!confirm("You have a saved game in progress. Do you want to overwrite it and start a fresh round?")) {
+            return;
+          }
+        }
+      } catch (e) {}
+      startGame();
+    });
     $("#resume-btn").addEventListener("click", resumeGame);
     $("#pdf-btn").addEventListener("click", () => {
       readMenu();
@@ -2187,6 +2236,7 @@
     $("#exit-btn").addEventListener("click", () => {
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
+    $("#restart-btn").addEventListener("click", restartHole);
     $("#save-btn").addEventListener("click", downloadBoardImage);
     $("#seed-input").addEventListener("input", refreshBlurb);
     $("#roll-hint").addEventListener("click", e => { e.stopPropagation(); doRoll(); });
@@ -2241,6 +2291,39 @@
 
       const p = P();
       if (!p) return;
+
+      // Speed Golf Club Shortcuts (D, I, P) during "roll" phase
+      if (S.mode === "speed" && S.phase === "roll") {
+        const fromT = terrainAt(p.pos);
+        if (e.key === "d" || e.key === "D") {
+          if (fromT === T.FAIR) {
+            e.preventDefault();
+            enterAim(6, "driver");
+            renderControls();
+            const btnRow = document.querySelector("#controls .row");
+            if (btnRow) markClub(btnRow, 0);
+          } else {
+            SFX.nope();
+          }
+          return;
+        }
+        if (e.key === "i" || e.key === "I") {
+          e.preventDefault();
+          enterAim(fromT === T.SAND ? 2 : 3, "iron");
+          renderControls();
+          const btnRow = document.querySelector("#controls .row");
+          if (btnRow) markClub(btnRow, 1);
+          return;
+        }
+        if (e.key === "p" || e.key === "P") {
+          e.preventDefault();
+          enterAim(1, "putt");
+          renderControls();
+          const btnRow = document.querySelector("#controls .row");
+          if (btnRow) markClub(btnRow, 2);
+          return;
+        }
+      }
 
       // 1. Roll / Primary action (Space, Enter, R)
       if (e.key === " " || e.key === "Enter" || e.key === "r" || e.key === "R") {
