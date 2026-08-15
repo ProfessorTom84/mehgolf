@@ -1002,6 +1002,13 @@
         row.appendChild(btn("Iron&nbsp;" + (fromT === T.SAND ? 2 : 3), "", () => { enterAim(fromT === T.SAND ? 2 : 3, "iron"); markClub(row, 1); }));
         row.appendChild(btn("Putter&nbsp;1", "", () => { enterAim(1, "putt"); markClub(row, 2); }));
         c.appendChild(row);
+
+        if (S.phase === "aim" || S.phase === "rolled") {
+          if (S.moveKind === "driver") markClub(row, 0);
+          else if (S.moveKind === "iron") markClub(row, 1);
+          else if (S.moveKind === "putt") markClub(row, 2);
+        }
+
         const hint = document.createElement("div");
         hint.className = "hint";
         hint.textContent = fromT === T.FAIR ? "Driver flies over trees." : fromT === T.SAND ? "Sand: iron only carries 2." : "From the rough: iron or putter.";
@@ -1011,7 +1018,11 @@
 
   }
   function markClub(row, i) {
-    [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
+    [...row.children].forEach((b, k) => {
+      const active = k === i;
+      b.classList.toggle("primary", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   }
 
   /* ---------------- inline legend ---------------- */
@@ -1918,7 +1929,11 @@
   function applyTheme(t) {
     S.theme = (t === "colour" || t === "ink") ? t : "colour";
     const pick = $("#theme-picker");
-    if (pick) [...pick.children].forEach(c => c.classList.toggle("on", c.dataset.t === S.theme));
+    if (pick) [...pick.children].forEach(c => {
+      const active = c.dataset.t === S.theme;
+      c.classList.toggle("on", active);
+      c.setAttribute("aria-checked", active ? "true" : "false");
+    });
     const th = $("#theme-hint"), ph = $("#pdf-theme-hint");
     if (th) th.textContent = THEME_HINTS[S.theme];
     if (ph) ph.textContent = PDF_HINTS[S.theme];
@@ -2153,7 +2168,11 @@
           S.players = playersN;
           const btn = document.querySelector(`#player-picker button[data-n="${playersN}"]`);
           if (btn) {
-            [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === btn));
+            [...$("#player-picker").children].forEach(x => {
+              const active = x === btn;
+              x.classList.toggle("on", active);
+              x.setAttribute("aria-checked", active ? "true" : "false");
+            });
           }
           $("#size-hint").textContent = S.players === 1
             ? "Solo \u2192 pocket notebook (14\u00D720)"
@@ -2168,7 +2187,11 @@
         S.mode = savedMode;
         const btn = document.querySelector(`#mode-picker button[data-m="${savedMode}"]`);
         if (btn) {
-          [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === btn));
+            [...$("#mode-picker").children].forEach(x => {
+              const active = x === btn;
+              x.classList.toggle("on", active);
+              x.setAttribute("aria-checked", active ? "true" : "false");
+            });
         }
         $("#mode-hint").textContent = S.mode === "dice"
           ? "Roll a die each shot. Fairway +1, sand \u22121."
@@ -2183,7 +2206,11 @@
     });
     $("#player-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      [...$("#player-picker").children].forEach(x => {
+        const active = x === b;
+        x.classList.toggle("on", active);
+        x.setAttribute("aria-checked", active ? "true" : "false");
+      });
       S.players = +b.dataset.n;
       try {
         localStorage.setItem("mehgolf.players", S.players);
@@ -2195,7 +2222,11 @@
     });
     $("#mode-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      [...$("#mode-picker").children].forEach(x => {
+        const active = x === b;
+        x.classList.toggle("on", active);
+        x.setAttribute("aria-checked", active ? "true" : "false");
+      });
       S.mode = b.dataset.m;
       try {
         localStorage.setItem("mehgolf.mode", S.mode);
@@ -2256,7 +2287,11 @@
     $("#theme-picker").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
-      [...$("#theme-picker").children].forEach(c => c.classList.toggle("on", c === b));
+      [...$("#theme-picker").children].forEach(c => {
+        const active = c === b;
+        c.classList.toggle("on", active);
+        c.setAttribute("aria-checked", active ? "true" : "false");
+      });
       applyTheme(b.dataset.t);
     });
 
@@ -2276,8 +2311,17 @@
     });
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
-        $("#modal").classList.add("hidden");
-        return;
+        let handled = false;
+        if (!$("#modal").classList.contains("hidden")) {
+          $("#modal").classList.add("hidden");
+          handled = true;
+        }
+        if (document.body.classList.contains("sheet-open")) {
+          document.body.classList.remove("sheet-open");
+          SFX.page();
+          handled = true;
+        }
+        if (handled) return;
       }
 
       // Check if we are on the game screen and no modal or banner is open
@@ -2292,16 +2336,14 @@
       const p = P();
       if (!p) return;
 
-      // Speed Golf Club Shortcuts (D, I, P) during "roll" phase
-      if (S.mode === "speed" && S.phase === "roll") {
+      // Speed Golf Club Shortcuts (D, I, P) during "roll", "rolled", or "aim" phase
+      if (S.mode === "speed" && (S.phase === "roll" || S.phase === "rolled" || S.phase === "aim")) {
         const fromT = terrainAt(p.pos);
         if (e.key === "d" || e.key === "D") {
           if (fromT === T.FAIR) {
             e.preventDefault();
             enterAim(6, "driver");
             renderControls();
-            const btnRow = document.querySelector("#controls .row");
-            if (btnRow) markClub(btnRow, 0);
           } else {
             SFX.nope();
           }
@@ -2311,16 +2353,12 @@
           e.preventDefault();
           enterAim(fromT === T.SAND ? 2 : 3, "iron");
           renderControls();
-          const btnRow = document.querySelector("#controls .row");
-          if (btnRow) markClub(btnRow, 1);
           return;
         }
         if (e.key === "p" || e.key === "P") {
           e.preventDefault();
           enterAim(1, "putt");
           renderControls();
-          const btnRow = document.querySelector("#controls .row");
-          if (btnRow) markClub(btnRow, 2);
           return;
         }
       }
