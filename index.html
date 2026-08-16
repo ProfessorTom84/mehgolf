@@ -134,11 +134,13 @@
   <header class="game-bar">
     <button id="exit-btn" class="btn ghost small" title="Back to menu">&larr; Menu</button>
     <div class="game-title">
-      <b id="course-name">Course</b>
+      <b id="course-name" role="button" tabindex="0" title="View course info and history" aria-label="View course info">Course</b>
       <span id="hole-label">Hole 1 / 18</span>
       <span class="seed-chip" id="seed-chip" title="Course seed"></span><span id="turn-chip" class="turn-chip hidden"></span><span class="build-tag" title="build version">v25</span>
     </div>
     <div class="game-bar-actions">
+      <button id="clubhouse-btn" class="btn ghost small" title="Course history and info">Clubhouse</button>
+      <button id="shortcuts-btn" class="btn ghost small" title="Keyboard shortcuts (?)">Shortcuts</button>
       <button id="pdf-btn2" class="btn ghost small" title="Download a printable paper version of this course">Print &amp; Play</button>
       <button id="save-btn" class="btn ghost small">Save</button>
       <button id="theme-btn" class="btn ghost small" title="Switch between colour and ink">Ink</button>
@@ -212,9 +214,9 @@
 </section>
 
 <!-- ============ SCORECARD MODAL ============ -->
-<div id="modal" class="modal hidden">
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal-card">
-    <div class="modal-head"><b>Scorecard</b><button id="modal-close" class="btn ghost small">&times;</button></div>
+    <div class="modal-head"><b id="modal-title">Scorecard</b><button id="modal-close" class="btn ghost small" aria-label="Close dialog">&times;</button></div>
     <div id="modal-body" class="modal-body"></div>
   </div>
 </div>

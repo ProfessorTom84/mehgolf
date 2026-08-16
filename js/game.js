@@ -1882,6 +1882,8 @@
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1897,6 +1899,57 @@
     html += "</table><p class='hint'>Par is 6 on every hole.</p>";
     body.innerHTML = html;
     $("#modal").classList.remove("hidden");
+    const closeBtn = $("#modal-close");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function openCourseCardModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse & Course Info";
+    const body = $("#modal-body");
+    const c = window.Course.courseCard(S.seed);
+    body.innerHTML = `
+      <div class="course-card">
+        <div class="cc-est">Established ${c.est}</div>
+        <h2 class="cc-name" style="margin-top: 0.3rem;">${c.name}</h2>
+        <div class="cc-rule"></div>
+        <p class="cc-hist">${c.history} ${c.known} ${c.warning}</p>
+        <p class="cc-colour">${c.colour}</p>
+        <p class="cc-motto">&ldquo;${c.motto}&rdquo;</p>
+        <div class="cc-code">Course code ${S.seed} \u00B7 18 holes \u00B7 par 6</div>
+      </div>`;
+    $("#modal").classList.remove("hidden");
+    const closeBtn = $("#modal-close");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function openShortcutsModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div class="shortcuts-container">
+        <table class="shortcuts-table">
+          <thead>
+            <tr><th>Shortcut</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>Space</kbd> / <kbd>Enter</kbd> / <kbd>R</kbd></td><td>Roll die / Primary action</td></tr>
+            <tr><td><kbd>P</kbd></td><td>Toggle Putt (1 dot)</td></tr>
+            <tr><td><kbd>M</kbd></td><td>Use Mulligan</td></tr>
+            <tr><td><kbd>T</kbd></td><td>Re-roll Tee shot (free)</td></tr>
+            <tr><td><kbd>B</kbd></td><td>Spot Bigfoot (when present)</td></tr>
+            <tr><td><kbd>D</kbd> / <kbd>I</kbd> / <kbd>P</kbd></td><td>Speed Golf: Driver (6) / Iron (3/2) / Putter (1)</td></tr>
+            <tr><td><kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> <kbd>&leftarrow;</kbd> / <kbd>WASD</kbd> / <kbd>1-8</kbd> / <kbd>Numpad</kbd></td><td>Aim shot direction</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Toggle Keyboard Shortcuts help</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close dialog / sheet</td></tr>
+          </tbody>
+        </table>
+        <p class="hint" style="margin-top:0.8rem;">Shortcuts can be used during your turn on screen.</p>
+      </div>`;
+    $("#modal").classList.remove("hidden");
+    const closeBtn = $("#modal-close");
+    if (closeBtn) closeBtn.focus();
   }
 
   const THEME_HINTS = {
@@ -2260,6 +2313,22 @@
       applyTheme(b.dataset.t);
     });
 
+    const courseNameEl = $("#course-name");
+    if (courseNameEl) {
+      courseNameEl.addEventListener("click", openCourseCardModal);
+      courseNameEl.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openCourseCardModal();
+        }
+      });
+    }
+    const clubhouseBtn = $("#clubhouse-btn");
+    if (clubhouseBtn) clubhouseBtn.addEventListener("click", openCourseCardModal);
+
+    const shortcutsBtn = $("#shortcuts-btn");
+    if (shortcutsBtn) shortcutsBtn.addEventListener("click", openShortcutsModal);
+
     // Same switch, reachable mid-round without going back to the menu.
     $("#theme-btn").addEventListener("click", () => {
       applyTheme(S.theme === "colour" ? "ink" : "colour");
@@ -2277,6 +2346,18 @@
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
         $("#modal").classList.add("hidden");
+        return;
+      }
+
+      // Allow '?' key to toggle shortcuts modal from anywhere when not editing text
+      if (e.key === "?" && (!document.activeElement || (document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA"))) {
+        e.preventDefault();
+        const modal = $("#modal");
+        if (modal && !modal.classList.contains("hidden") && $("#modal-title")?.textContent === "Keyboard Shortcuts") {
+          modal.classList.add("hidden");
+        } else {
+          openShortcutsModal();
+        }
         return;
       }
 

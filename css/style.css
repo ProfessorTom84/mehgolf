@@ -167,6 +167,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .game-bar .btn.ghost:hover{border-color:var(--paper)}
 .game-title{flex:1; display:flex; align-items:baseline; gap:.7rem; flex-wrap:wrap}
 .game-title b{font-size:1.05rem; letter-spacing:.04em}
+#course-name[role="button"]{cursor:pointer; transition:opacity .15s ease, text-decoration .15s ease}
+#course-name[role="button"]:hover{text-decoration:underline; opacity:.9}
+#course-name[role="button"]:focus-visible{outline:2px solid var(--paper); outline-offset:2px; border-radius:2px}
 #hole-label{opacity:.85; font-size:.9rem}
 .seed-chip{font-size:.72rem; opacity:.6; border:1px solid rgba(255,255,255,.35); border-radius:99px; padding:.05rem .5rem}
 .game-bar-actions{display:flex; gap:.3rem}
@@ -566,6 +569,12 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .legend-icon{flex:0 0 auto; width:30px; height:30px}
 .legend-row b{font-size:.9rem}
 .legend-row p{margin:.1rem 0 0; font-size:.82rem; color:#6a6d64; line-height:1.4}
+
+.shortcuts-table{border-collapse:collapse; width:100%; font-size:.85rem; margin-top:.3rem}
+.shortcuts-table th,.shortcuts-table td{border:1px solid var(--graphite); padding:.4rem .6rem; text-align:left; vertical-align:middle}
+.shortcuts-table th{background:var(--paper-shade); font-weight:700}
+.shortcuts-table td:first-child{white-space:nowrap; width:45%}
+kbd{background:var(--paper-shade); border:1.5px solid var(--ink); border-radius:4px; box-shadow:1px 1px 0 var(--ink); font-family:inherit; font-weight:700; font-size:.78rem; padding:.1rem .35rem; display:inline-block; margin:0 .1rem}
 
 /* ---------- responsive ---------- */
 @media (max-width:1240px){
