@@ -687,7 +687,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
     white-space:nowrap; overflow:hidden;
   }
   .game-bar h1{font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0}
-  #course-name{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom}
+  #course-name{max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:bottom; cursor:pointer}
   .game-bar .hole-count{font-size:.72rem; white-space:nowrap}
   #seed-chip{display:none}
   .turn-chip{margin-left:.25rem}

@@ -1002,6 +1002,15 @@
         row.appendChild(btn("Iron&nbsp;" + (fromT === T.SAND ? 2 : 3), "", () => { enterAim(fromT === T.SAND ? 2 : 3, "iron"); markClub(row, 1); }));
         row.appendChild(btn("Putter&nbsp;1", "", () => { enterAim(1, "putt"); markClub(row, 2); }));
         c.appendChild(row);
+
+        if (S.phase === "aim") {
+          if (S.moveKind === "driver") markClub(row, 0);
+          else if (S.moveKind === "iron") markClub(row, 1);
+          else if (S.moveKind === "putt") markClub(row, 2);
+        } else {
+          markClub(row, -1);
+        }
+
         const hint = document.createElement("div");
         hint.className = "hint";
         hint.textContent = fromT === T.FAIR ? "Driver flies over trees." : fromT === T.SAND ? "Sand: iron only carries 2." : "From the rough: iron or putter.";
@@ -1011,7 +1020,11 @@
 
   }
   function markClub(row, i) {
-    [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
+    [...row.children].forEach((b, k) => {
+      const active = (k === i);
+      b.classList.toggle("primary", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   }
 
   /* ---------------- inline legend ---------------- */
@@ -1882,6 +1895,8 @@
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1896,6 +1911,47 @@
     });
     html += "</table><p class='hint'>Par is 6 on every hole.</p>";
     body.innerHTML = html;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openClubhouse() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse Info";
+    const body = $("#modal-body");
+    const c = window.Course.courseCard(S.seed);
+    body.innerHTML = `
+      <div class="course-card">
+        <div class="cc-est">Established ${c.est}</div>
+        <h2 class="cc-name">${c.name}</h2>
+        <div class="cc-rule"></div>
+        <p class="cc-hist">${c.history} ${c.known} ${c.warning}</p>
+        <p class="cc-colour">${c.colour}</p>
+        <p class="cc-motto">&ldquo;${c.motto}&rdquo;</p>
+        <div class="cc-code">Course code ${S.seed} \u00B7 18 holes \u00B7 par 6</div>
+      </div>`;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openShortcuts() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div class="shortcuts-modal">
+        <table class="shortcuts-table" style="width:100%; border-collapse:collapse; margin-top:0.4rem;">
+          <tr style="border-bottom:1px solid var(--ink);"><th style="text-align:left; padding:0.4rem;">Key</th><th style="text-align:left; padding:0.4rem;">Action</th></tr>
+          <tr><td style="padding:0.4rem;"><b>Space / Enter / R</b></td><td style="padding:0.4rem;">Roll the die</td></tr>
+          <tr><td style="padding:0.4rem;"><b>1 &ndash; 8 / Arrows / WASD</b></td><td style="padding:0.4rem;">Aim and shot direction</td></tr>
+          <tr><td style="padding:0.4rem;"><b>P</b></td><td style="padding:0.4rem;">Toggle putt (Dice) / Putter (Speed)</td></tr>
+          <tr><td style="padding:0.4rem;"><b>D</b></td><td style="padding:0.4rem;">Select Driver (Speed Golf)</td></tr>
+          <tr><td style="padding:0.4rem;"><b>I</b></td><td style="padding:0.4rem;">Select Iron (Speed Golf)</td></tr>
+          <tr><td style="padding:0.4rem;"><b>M</b></td><td style="padding:0.4rem;">Use Mulligan</td></tr>
+          <tr><td style="padding:0.4rem;"><b>T</b></td><td style="padding:0.4rem;">Use Tee re-roll</td></tr>
+          <tr><td style="padding:0.4rem;"><b>B</b></td><td style="padding:0.4rem;">Spot Bigfoot</td></tr>
+          <tr><td style="padding:0.4rem;"><b>?</b></td><td style="padding:0.4rem;">Show this shortcuts modal</td></tr>
+          <tr><td style="padding:0.4rem;"><b>Esc</b></td><td style="padding:0.4rem;">Close open dialog / modal</td></tr>
+        </table>
+      </div>`;
     $("#modal").classList.remove("hidden");
   }
 
@@ -2001,7 +2057,7 @@
       if (legend.parentNode !== sheet) sheet.appendChild(legend);
       // Print & Play / Save / Ink / Restart are rarely used mid-round; they were forcing
       // the bar onto a second line, so they move into the sheet.
-      if (tools) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
+      if (tools) ["clubhouse-btn", "shortcuts-btn", "pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== tools) tools.appendChild(b);
       });
@@ -2009,7 +2065,7 @@
       document.body.classList.remove("sheet-open");
       if (left.parentNode !== sheetHome.leftParent) sheetHome.leftParent.insertBefore(left, sheetHome.leftParent.firstChild);
       if (legend.parentNode !== sheetHome.legendParent) sheetHome.legendParent.appendChild(legend);
-      if (acts) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
+      if (acts) ["clubhouse-btn", "shortcuts-btn", "pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== acts) acts.insertBefore(b, acts.firstChild);
       });
@@ -2233,6 +2289,13 @@
     $("#mute-btn2").addEventListener("click", toggleMute);
     syncMute();
 
+    const chBtn = $("#clubhouse-btn");
+    if (chBtn) chBtn.addEventListener("click", openClubhouse);
+    const cnEl = $("#course-name");
+    if (cnEl) cnEl.addEventListener("click", openClubhouse);
+    const scBtn = $("#shortcuts-btn");
+    if (scBtn) scBtn.addEventListener("click", openShortcuts);
+
     $("#exit-btn").addEventListener("click", () => {
       if (S.phase === "over" || confirm("Leave this round and head back to the menu?")) showMenu();
     });
@@ -2280,6 +2343,12 @@
         return;
       }
 
+      if (e.key === "?") {
+        e.preventDefault();
+        openShortcuts();
+        return;
+      }
+
       // Check if we are on the game screen and no modal or banner is open
       const gameHidden = $("#game").classList.contains("hidden");
       const modalHidden = $("#modal").classList.contains("hidden");
@@ -2292,8 +2361,8 @@
       const p = P();
       if (!p) return;
 
-      // Speed Golf Club Shortcuts (D, I, P) during "roll" phase
-      if (S.mode === "speed" && S.phase === "roll") {
+      // Speed Golf Club Shortcuts (D, I, P) during "roll", "rolled", or "aim" phase
+      if (S.mode === "speed" && (S.phase === "roll" || S.phase === "rolled" || S.phase === "aim")) {
         const fromT = terrainAt(p.pos);
         if (e.key === "d" || e.key === "D") {
           if (fromT === T.FAIR) {
