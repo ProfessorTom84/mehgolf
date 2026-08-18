@@ -1882,6 +1882,8 @@
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1896,6 +1898,54 @@
     });
     html += "</table><p class='hint'>Par is 6 on every hole.</p>";
     body.innerHTML = html;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openClubhouse() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse & Course Info";
+    const body = $("#modal-body");
+    const c = window.Course.courseCard(S.seed);
+    body.innerHTML = `
+      <div class="course-card" style="box-shadow:none; border:none; padding:0;">
+        <div class="cc-est">Established ${c.est}</div>
+        <h2 class="cc-name" style="margin-top:0.2rem;">${c.name}</h2>
+        <div class="cc-rule"></div>
+        <p class="cc-hist">${c.history} ${c.known} ${c.warning}</p>
+        <p class="cc-colour">${c.colour}</p>
+        <p class="cc-motto">&ldquo;${c.motto}&rdquo;</p>
+        <div class="cc-code">Course code ${S.seed} \u00B7 18 holes \u00B7 par 6</div>
+      </div>`;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openShortcuts() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div style="font-size:0.9rem; line-height:1.6;">
+        <p><b>General Gameplay</b></p>
+        <ul style="margin:0.2rem 0 0.8rem 1.2rem; padding:0;">
+          <li><b>Space / Enter / R:</b> Roll die or shoot</li>
+          <li><b>P:</b> Toggle Putt (1 dot)</li>
+          <li><b>M:</b> Take Mulligan</li>
+          <li><b>T:</b> Re-roll Tee shot</li>
+          <li><b>B:</b> Spot Bigfoot</li>
+          <li><b>?:</b> Open Keyboard Shortcuts modal</li>
+          <li><b>Escape:</b> Close open modal dialogs</li>
+        </ul>
+        <p><b>Aiming Direction</b></p>
+        <ul style="margin:0.2rem 0 0.8rem 1.2rem; padding:0;">
+          <li><b>Arrow keys / WASD / 1-8:</b> Choose shot direction</li>
+        </ul>
+        <p><b>Speed Golf Clubs</b></p>
+        <ul style="margin:0.2rem 0 0 1.2rem; padding:0;">
+          <li><b>D:</b> Driver (6 dots, fairway only)</li>
+          <li><b>I:</b> Iron (3 dots / 2 in sand)</li>
+          <li><b>P:</b> Putter (1 dot)</li>
+        </ul>
+      </div>`;
     $("#modal").classList.remove("hidden");
   }
 
@@ -2274,9 +2324,29 @@
       PDF.downloadCoursePDF(S.course, 0, 18, S.theme === "colour");
       SFX.page();
     });
+    $("#clubhouse-btn").addEventListener("click", () => {
+      openClubhouse();
+      SFX.page();
+    });
+    $("#shortcuts-btn").addEventListener("click", () => {
+      openShortcuts();
+      SFX.page();
+    });
+    $("#course-name").addEventListener("click", () => {
+      openClubhouse();
+      SFX.page();
+    });
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
         $("#modal").classList.add("hidden");
+        return;
+      }
+
+      // Allow '?' to open shortcuts modal even if game screen is active
+      if (e.key === "?" && !document.activeElement?.matches("input, textarea")) {
+        e.preventDefault();
+        openShortcuts();
+        SFX.page();
         return;
       }
 
