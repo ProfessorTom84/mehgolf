@@ -1,7 +1,7 @@
 /* Meh Golf — game state, SVG board, turn machine, UI wiring. */
-(function () {
+(function (global) {
   "use strict";
-  const { T, DIRS, SIZES, genCourse, cell, inB } = window.Course;
+  const { T, DIRS, SIZES, genCourse, cell, inB } = global.Course || (typeof window !== "undefined" && window.Course);
   const $ = s => document.querySelector(s);
 
   const C = 34;                 // svg cell size
@@ -23,7 +23,8 @@
     caddieKey: "", caddieText: "", lastShooter: -1,
     theme: "colour"           // "colour" | "ink"
   };
-  window.S = S;
+  global.S = S;
+  if (typeof window !== "undefined") window.S = S;
 
   /* ---------------- helpers ---------------- */
   const g = () => S.course.holes[S.holeIdx];
@@ -1881,7 +1882,65 @@
   }
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
+  function openClubhouseModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse \u2014 Course Info";
+    const body = $("#modal-body");
+    const cc = (global.Course || window.Course).courseCard(S.seed);
+    const bf = S.course ? S.course.bigfoot : null;
+    let bfText = "No reports of Bigfoot on this course.";
+    if (bf) {
+      if (S.bigfootFound) {
+        bfText = `Bigfoot spotted on Hole ${bf.hole + 1}! (+1 bonus mulligan awarded)`;
+      } else {
+        bfText = `Rumour has it Bigfoot is hiding somewhere on Hole ${bf.hole + 1}\u2026`;
+      }
+    }
+    body.innerHTML = `
+      <div class="course-card" style="text-align:left; padding:0.5rem 0;">
+        <div class="cc-est" style="font-size:0.85rem; color:#5b5e57;">Established ${cc.est}</div>
+        <h2 class="cc-name" style="font-size:1.4rem; margin:0.2rem 0;">${cc.name}</h2>
+        <div class="cc-rule" style="border-top:2px solid var(--ink); margin:0.5rem 0;"></div>
+        <p style="margin:0.5rem 0; line-height:1.4;">${cc.history} ${cc.known} ${cc.warning}</p>
+        <p style="margin:0.5rem 0; font-style:italic; color:#5b5e57;">${cc.colour}</p>
+        <p style="margin:0.5rem 0; font-weight:bold;">&ldquo;${cc.motto}&rdquo;</p>
+        <div style="margin-top:0.8rem; padding:0.6rem; background:rgba(0,0,0,0.04); border-radius:6px; font-size:0.88rem;">
+          <div><b>Course Code:</b> ${S.seed}</div>
+          <div><b>Par:</b> 6 on every hole (108 total)</div>
+          <div><b>Grid Size:</b> ${S.size === "xl" ? "XL (18\u00D726)" : "Pocket (14\u00D720)"}</div>
+          <div><b>Bigfoot:</b> ${bfText}</div>
+        </div>
+      </div>
+    `;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openShortcutsModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div style="text-align:left; font-size:0.9rem; line-height:1.5;">
+        <table style="width:100%; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid #ddd;"><th style="padding:6px; text-align:left;">Key</th><th style="padding:6px; text-align:left;">Action</th></tr>
+          <tr><td style="padding:6px;"><b>Space / Enter / R</b></td><td style="padding:6px;">Roll die / Primary action</td></tr>
+          <tr><td style="padding:6px;"><b>1 &ndash; 8 / Arrows / WASD / Numpad</b></td><td style="padding:6px;">Select shooting / aim direction</td></tr>
+          <tr><td style="padding:6px;"><b>P</b></td><td style="padding:6px;">Toggle putt (1 dot)</td></tr>
+          <tr><td style="padding:6px;"><b>M</b></td><td style="padding:6px;">Spend mulligan</td></tr>
+          <tr><td style="padding:6px;"><b>T</b></td><td style="padding:6px;">Free tee re-roll (on tee shot)</td></tr>
+          <tr><td style="padding:6px;"><b>B</b></td><td style="padding:6px;">Spot Bigfoot</td></tr>
+          <tr><td style="padding:6px;"><b>D / I / P</b></td><td style="padding:6px;">Driver / Iron / Putter (Speed Golf mode)</td></tr>
+          <tr><td style="padding:6px;"><b>? / H</b></td><td style="padding:6px;">Open this shortcuts guide</td></tr>
+          <tr><td style="padding:6px;"><b>Esc</b></td><td style="padding:6px;">Close modal or mobile sheet</td></tr>
+        </table>
+      </div>
+    `;
+    $("#modal").classList.remove("hidden");
+  }
+
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1918,7 +1977,11 @@
   function applyTheme(t) {
     S.theme = (t === "colour" || t === "ink") ? t : "colour";
     const pick = $("#theme-picker");
-    if (pick) [...pick.children].forEach(c => c.classList.toggle("on", c.dataset.t === S.theme));
+    if (pick) [...pick.children].forEach(c => {
+      const isOn = c.dataset.t === S.theme;
+      c.classList.toggle("on", isOn);
+      c.setAttribute("aria-checked", isOn ? "true" : "false");
+    });
     const th = $("#theme-hint"), ph = $("#pdf-theme-hint");
     if (th) th.textContent = THEME_HINTS[S.theme];
     if (ph) ph.textContent = PDF_HINTS[S.theme];
@@ -2001,7 +2064,7 @@
       if (legend.parentNode !== sheet) sheet.appendChild(legend);
       // Print & Play / Save / Ink / Restart are rarely used mid-round; they were forcing
       // the bar onto a second line, so they move into the sheet.
-      if (tools) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
+      if (tools) ["clubhouse-btn", "shortcuts-btn", "pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== tools) tools.appendChild(b);
       });
@@ -2009,7 +2072,7 @@
       document.body.classList.remove("sheet-open");
       if (left.parentNode !== sheetHome.leftParent) sheetHome.leftParent.insertBefore(left, sheetHome.leftParent.firstChild);
       if (legend.parentNode !== sheetHome.legendParent) sheetHome.legendParent.appendChild(legend);
-      if (acts) ["pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
+      if (acts) ["clubhouse-btn", "shortcuts-btn", "pdf-btn2", "save-btn", "theme-btn", "restart-btn"].forEach(id => {
         const b = document.getElementById(id);
         if (b && b.parentNode !== acts) acts.insertBefore(b, acts.firstChild);
       });
@@ -2151,10 +2214,11 @@
         const playersN = parseInt(savedPlayers, 10);
         if ([1, 2, 3, 4].includes(playersN)) {
           S.players = playersN;
-          const btn = document.querySelector(`#player-picker button[data-n="${playersN}"]`);
-          if (btn) {
-            [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === btn));
-          }
+          [...$("#player-picker").children].forEach(x => {
+            const isOn = parseInt(x.dataset.n, 10) === playersN;
+            x.classList.toggle("on", isOn);
+            x.setAttribute("aria-checked", isOn ? "true" : "false");
+          });
           $("#size-hint").textContent = S.players === 1
             ? "Solo \u2192 pocket notebook (14\u00D720)"
             : `${S.players} players \u2192 XL notebook (18\u00D726), pass-and-play`;
@@ -2166,10 +2230,11 @@
       const savedMode = localStorage.getItem("mehgolf.mode");
       if (savedMode && ["dice", "speed"].includes(savedMode)) {
         S.mode = savedMode;
-        const btn = document.querySelector(`#mode-picker button[data-m="${savedMode}"]`);
-        if (btn) {
-          [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === btn));
-        }
+        [...$("#mode-picker").children].forEach(x => {
+          const isOn = x.dataset.m === savedMode;
+          x.classList.toggle("on", isOn);
+          x.setAttribute("aria-checked", isOn ? "true" : "false");
+        });
         $("#mode-hint").textContent = S.mode === "dice"
           ? "Roll a die each shot. Fairway +1, sand \u22121."
           : "No die: choose driver, iron, or putter each shot.";
@@ -2183,7 +2248,11 @@
     });
     $("#player-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      [...$("#player-picker").children].forEach(x => {
+        const isOn = x === b;
+        x.classList.toggle("on", isOn);
+        x.setAttribute("aria-checked", isOn ? "true" : "false");
+      });
       S.players = +b.dataset.n;
       try {
         localStorage.setItem("mehgolf.players", S.players);
@@ -2195,7 +2264,11 @@
     });
     $("#mode-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      [...$("#mode-picker").children].forEach(x => {
+        const isOn = x === b;
+        x.classList.toggle("on", isOn);
+        x.setAttribute("aria-checked", isOn ? "true" : "false");
+      });
       S.mode = b.dataset.m;
       try {
         localStorage.setItem("mehgolf.mode", S.mode);
@@ -2270,6 +2343,15 @@
     applyTheme(saved || S.theme);
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });
+    $("#clubhouse-btn").addEventListener("click", openClubhouseModal);
+    $("#shortcuts-btn").addEventListener("click", openShortcutsModal);
+    $("#course-name").addEventListener("click", openClubhouseModal);
+    $("#course-name").addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openClubhouseModal();
+      }
+    });
     $("#pdf-btn2").addEventListener("click", () => {
       PDF.downloadCoursePDF(S.course, 0, 18, S.theme === "colour");
       SFX.page();
@@ -2323,6 +2405,13 @@
           if (btnRow) markClub(btnRow, 2);
           return;
         }
+      }
+
+      // 3b. Shortcuts modal (? or H)
+      if (e.key === "?" || e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        openShortcutsModal();
+        return;
       }
 
       // 1. Roll / Primary action (Space, Enter, R)
@@ -2443,4 +2532,4 @@
   }
 
   wireMenu();
-})();
+})(typeof window !== "undefined" ? window : globalThis);

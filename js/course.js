@@ -549,4 +549,4 @@
   }
 
   global.Course = { T, DIRS, SIZES, genCourse, genHole, courseName, courseBlurb, courseCard, cell, inB };
-})(window);
+})(typeof window !== "undefined" ? window : globalThis);

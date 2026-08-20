@@ -420,4 +420,4 @@
   }
 
   global.PDF = { downloadCoursePDF };
-})(window);
+})(typeof window !== "undefined" ? window : globalThis);
