@@ -42,4 +42,4 @@
   const ri = (rng, min, max) => min + ((rng() * (max - min + 1)) | 0); // inclusive int
 
   global.RNG = { rngFor, randSeedCode, pick, ri };
-})(window);
+})(typeof window !== "undefined" ? window : globalThis);

@@ -1,7 +1,7 @@
 /* Meh Golf — game state, SVG board, turn machine, UI wiring. */
-(function () {
+(function (global) {
   "use strict";
-  const { T, DIRS, SIZES, genCourse, cell, inB } = window.Course;
+  const { T, DIRS, SIZES, genCourse, cell, inB } = global.Course;
   const $ = s => document.querySelector(s);
 
   const C = 34;                 // svg cell size
@@ -23,7 +23,8 @@
     caddieKey: "", caddieText: "", lastShooter: -1,
     theme: "colour"           // "colour" | "ink"
   };
-  window.S = S;
+  global.S = S;
+  if (typeof window !== "undefined") window.S = S;
 
   /* ---------------- helpers ---------------- */
   const g = () => S.course.holes[S.holeIdx];
@@ -997,11 +998,20 @@
     } else { // speed golf
       if (S.phase === "roll" || S.phase === "rolled" || S.phase === "aim") {
         const row = document.createElement("div"); row.className = "row";
-        row.appendChild(btn("Driver&nbsp;6", "", () => { enterAim(6, "driver"); markClub(row, 0); },
-          fromT !== T.FAIR));
-        row.appendChild(btn("Iron&nbsp;" + (fromT === T.SAND ? 2 : 3), "", () => { enterAim(fromT === T.SAND ? 2 : 3, "iron"); markClub(row, 1); }));
-        row.appendChild(btn("Putter&nbsp;1", "", () => { enterAim(1, "putt"); markClub(row, 2); }));
+        const btnDriver = btn("Driver&nbsp;6", "", () => { enterAim(6, "driver"); markClub(row, 0); }, fromT !== T.FAIR);
+        const btnIron = btn("Iron&nbsp;" + (fromT === T.SAND ? 2 : 3), "", () => { enterAim(fromT === T.SAND ? 2 : 3, "iron"); markClub(row, 1); });
+        const btnPutt = btn("Putter&nbsp;1", "", () => { enterAim(1, "putt"); markClub(row, 2); });
+        row.appendChild(btnDriver);
+        row.appendChild(btnIron);
+        row.appendChild(btnPutt);
         c.appendChild(row);
+
+        if (S.phase === "aim") {
+          if (S.moveKind === "driver") markClub(row, 0);
+          else if (S.moveKind === "iron") markClub(row, 1);
+          else if (S.moveKind === "putt") markClub(row, 2);
+        }
+
         const hint = document.createElement("div");
         hint.className = "hint";
         hint.textContent = fromT === T.FAIR ? "Driver flies over trees." : fromT === T.SAND ? "Sand: iron only carries 2." : "From the rough: iron or putter.";
@@ -1011,7 +1021,12 @@
 
   }
   function markClub(row, i) {
-    [...row.children].forEach((b, k) => b.classList.toggle("primary", k === i));
+    if (!row) return;
+    [...row.children].forEach((b, k) => {
+      const active = k === i;
+      b.classList.toggle("primary", active);
+      b.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   }
 
   /* ---------------- inline legend ---------------- */
@@ -1882,6 +1897,8 @@
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1896,6 +1913,45 @@
     });
     html += "</table><p class='hint'>Par is 6 on every hole.</p>";
     body.innerHTML = html;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openClubhouseModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse Course Info";
+    const body = $("#modal-body");
+    const seed = S.seed || "40217593";
+    const cc = global.Course.courseCard(seed);
+    body.innerHTML = `
+      <div class="course-card">
+        <div class="cc-est">Established ${cc.est}</div>
+        <h2 class="cc-name">${cc.name}</h2>
+        <div class="cc-rule"></div>
+        <p class="cc-hist">${cc.history} ${cc.known} ${cc.warning}</p>
+        <p class="cc-colour">${cc.colour}</p>
+        <p class="cc-motto">&ldquo;${cc.motto}&rdquo;</p>
+        <div class="cc-code">Course code ${seed} &middot; 18 holes &middot; par 6</div>
+      </div>`;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openShortcutsModal() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div style="font-size:0.88rem; line-height:1.6;">
+        <p><b>Space / Enter / R:</b> Roll die or select primary action</p>
+        <p><b>P:</b> Toggle putt (1 dot) in Dice Golf; select Putter in Speed Golf</p>
+        <p><b>D:</b> Select Driver (Speed Golf)</p>
+        <p><b>I:</b> Select Iron (Speed Golf)</p>
+        <p><b>M:</b> Spend a Mulligan</p>
+        <p><b>T:</b> Use Tee re-roll (first shot of hole)</p>
+        <p><b>B:</b> Spot Bigfoot when hiding on current hole</p>
+        <p><b>1–8 / Numpad / WASD / Arrows:</b> Select aim direction</p>
+        <p><b>?:</b> Open this Keyboard Shortcuts menu</p>
+        <p><b>Escape:</b> Close active modal or sheet</p>
+      </div>`;
     $("#modal").classList.remove("hidden");
   }
 
@@ -1918,7 +1974,10 @@
   function applyTheme(t) {
     S.theme = (t === "colour" || t === "ink") ? t : "colour";
     const pick = $("#theme-picker");
-    if (pick) [...pick.children].forEach(c => c.classList.toggle("on", c.dataset.t === S.theme));
+    if (pick) {
+      [...pick.children].forEach(c => c.classList.toggle("on", c.dataset.t === S.theme));
+      updateSegmentedChecked(pick);
+    }
     const th = $("#theme-hint"), ph = $("#pdf-theme-hint");
     if (th) th.textContent = THEME_HINTS[S.theme];
     if (ph) ph.textContent = PDF_HINTS[S.theme];
@@ -2075,6 +2134,13 @@
     checkSaveGame();
   }
 
+  function updateSegmentedChecked(container) {
+    if (!container) return;
+    [...container.children].forEach(btn => {
+      btn.setAttribute("aria-checked", btn.classList.contains("on") ? "true" : "false");
+    });
+  }
+
   function updatePlayerNameInputs() {
     const container = $("#player-names-container");
     if (!container) return;
@@ -2184,6 +2250,7 @@
     $("#player-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       [...$("#player-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      updateSegmentedChecked($("#player-picker"));
       S.players = +b.dataset.n;
       try {
         localStorage.setItem("mehgolf.players", S.players);
@@ -2196,6 +2263,7 @@
     $("#mode-picker").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       [...$("#mode-picker").children].forEach(x => x.classList.toggle("on", x === b));
+      updateSegmentedChecked($("#mode-picker"));
       S.mode = b.dataset.m;
       try {
         localStorage.setItem("mehgolf.mode", S.mode);
@@ -2257,6 +2325,7 @@
       const b = e.target.closest("button");
       if (!b) return;
       [...$("#theme-picker").children].forEach(c => c.classList.toggle("on", c === b));
+      updateSegmentedChecked($("#theme-picker"));
       applyTheme(b.dataset.t);
     });
 
@@ -2274,9 +2343,26 @@
       PDF.downloadCoursePDF(S.course, 0, 18, S.theme === "colour");
       SFX.page();
     });
+
+    const courseNameEl = $("#course-name");
+    if (courseNameEl) {
+      courseNameEl.style.cursor = "pointer";
+      courseNameEl.addEventListener("click", openClubhouseModal);
+    }
+    const clubhouseBtn = $("#clubhouse-btn");
+    if (clubhouseBtn) clubhouseBtn.addEventListener("click", openClubhouseModal);
+    const shortcutsBtn = $("#shortcuts-btn");
+    if (shortcutsBtn) shortcutsBtn.addEventListener("click", openShortcutsModal);
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
         $("#modal").classList.add("hidden");
+        document.body.classList.remove("sheet-open");
+        return;
+      }
+
+      if (e.key === "?") {
+        e.preventDefault();
+        openShortcutsModal();
         return;
       }
 
@@ -2292,16 +2378,14 @@
       const p = P();
       if (!p) return;
 
-      // Speed Golf Club Shortcuts (D, I, P) during "roll" phase
-      if (S.mode === "speed" && S.phase === "roll") {
+      // Speed Golf Club Shortcuts (D, I, P) during active club selection phases
+      if (S.mode === "speed" && (S.phase === "roll" || S.phase === "rolled" || S.phase === "aim")) {
         const fromT = terrainAt(p.pos);
         if (e.key === "d" || e.key === "D") {
           if (fromT === T.FAIR) {
             e.preventDefault();
             enterAim(6, "driver");
             renderControls();
-            const btnRow = document.querySelector("#controls .row");
-            if (btnRow) markClub(btnRow, 0);
           } else {
             SFX.nope();
           }
@@ -2311,16 +2395,12 @@
           e.preventDefault();
           enterAim(fromT === T.SAND ? 2 : 3, "iron");
           renderControls();
-          const btnRow = document.querySelector("#controls .row");
-          if (btnRow) markClub(btnRow, 1);
           return;
         }
         if (e.key === "p" || e.key === "P") {
           e.preventDefault();
           enterAim(1, "putt");
           renderControls();
-          const btnRow = document.querySelector("#controls .row");
-          if (btnRow) markClub(btnRow, 2);
           return;
         }
       }
@@ -2443,4 +2523,4 @@
   }
 
   wireMenu();
-})();
+})(typeof window !== "undefined" ? window : globalThis);

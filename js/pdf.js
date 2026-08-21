@@ -182,7 +182,7 @@
     d.text(M, 138, 9, "Type that code into the game to play these exact holes on screen.");
 
     /* The course record, boxed like a club plaque. */
-    const cc = window.Course.courseCard(course.seed);
+    const cc = global.Course.courseCard(course.seed);
     const cardY = 150, cardW = PW - M * 2;
     d.strokeG(0.45); d.lw(1);
     let by = cardY + 16;
@@ -420,4 +420,4 @@
   }
 
   global.PDF = { downloadCoursePDF };
-})(window);
+})(typeof window !== "undefined" ? window : globalThis);
