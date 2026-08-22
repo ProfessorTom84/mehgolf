@@ -1882,6 +1882,8 @@
   function hideBanner() { $("#banner").classList.add("hidden"); }
 
   function openScorecard() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Scorecard";
     const body = $("#modal-body");
     let html = `<table class="score-table"><tr><th></th>`;
     for (let h = 0; h < 18; h++) html += `<th>${h + 1}</th>`;
@@ -1896,6 +1898,44 @@
     });
     html += "</table><p class='hint'>Par is 6 on every hole.</p>";
     body.innerHTML = html;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openClubhouse() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Clubhouse Course Info";
+    const body = $("#modal-body");
+    const c = window.Course.courseCard(S.seed);
+    body.innerHTML = `
+      <div class="course-card" style="margin: 0; padding: 0.5rem;">
+        <div class="cc-est">Established ${c.est}</div>
+        <h2 class="cc-name" style="margin: 0.3rem 0;">${c.name}</h2>
+        <div class="cc-rule"></div>
+        <p class="cc-hist" style="margin-top: 0.5rem;">${c.history} ${c.known} ${c.warning}</p>
+        <p class="cc-colour">${c.colour}</p>
+        <p class="cc-motto">&ldquo;${c.motto}&rdquo;</p>
+        <div class="cc-code">Course code ${S.seed} \u00B7 18 holes \u00B7 par 6</div>
+      </div>
+    `;
+    $("#modal").classList.remove("hidden");
+  }
+
+  function openShortcuts() {
+    const title = $("#modal-title");
+    if (title) title.textContent = "Keyboard Shortcuts";
+    const body = $("#modal-body");
+    body.innerHTML = `
+      <div style="font-family: inherit; font-size: 0.95rem; line-height: 1.6;">
+        <p><b>Roll / Continue:</b> Space, Enter, or R</p>
+        <p><b>Toggle Putt:</b> P</p>
+        <p><b>Mulligan:</b> M</p>
+        <p><b>Tee Re-roll:</b> T</p>
+        <p><b>Spot Bigfoot:</b> B</p>
+        <p><b>Speed Golf Clubs:</b> D (Driver), I (Iron), P (Putter)</p>
+        <p><b>Aim Direction:</b> Arrow Keys, WASD, Numpad (1-9), or 1–8 keys</p>
+        <p><b>Close Modal / Overlay:</b> Escape</p>
+      </div>
+    `;
     $("#modal").classList.remove("hidden");
   }
 
@@ -2270,6 +2310,20 @@
     applyTheme(saved || S.theme);
     $("#modal-close").addEventListener("click", () => $("#modal").classList.add("hidden"));
     $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.add("hidden"); });
+    $("#clubhouse-btn").addEventListener("click", () => {
+      openClubhouse();
+      SFX.page();
+    });
+    $("#shortcuts-btn").addEventListener("click", () => {
+      openShortcuts();
+      SFX.page();
+    });
+    $("#course-name").addEventListener("click", () => {
+      if (S.course) {
+        openClubhouse();
+        SFX.page();
+      }
+    });
     $("#pdf-btn2").addEventListener("click", () => {
       PDF.downloadCoursePDF(S.course, 0, 18, S.theme === "colour");
       SFX.page();
@@ -2277,6 +2331,13 @@
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
         $("#modal").classList.add("hidden");
+        return;
+      }
+
+      if (e.key === "?") {
+        e.preventDefault();
+        openShortcuts();
+        SFX.page();
         return;
       }
 
