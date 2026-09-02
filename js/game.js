@@ -1216,6 +1216,12 @@
     const dist = Math.max(Math.abs(p.pos.x - G.hole.x), Math.abs(p.pos.y - G.hole.y));
     const lie = terrainAt(p.pos);
 
+    if (p.holed) {
+      if (p.strokes === 1) return "ace";
+      if (p.strokes <= 4) return "birdie";
+      return "holed";
+    }
+
     if (p.strokes === 0) {
       if (S.holeIdx === 17) return "final";
       // In a multiplayer round, comment on the standings at the tee.
@@ -2280,6 +2286,19 @@
         return;
       }
 
+      // Scorecard shortcut (S / C) when game screen is active and not typing in input
+      if ((e.key === "s" || e.key === "S" || e.key === "c" || e.key === "C") && !$("#game").classList.contains("hidden")) {
+        if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) return;
+        e.preventDefault();
+        const modal = $("#modal");
+        if (modal.classList.contains("hidden")) {
+          openScorecard();
+        } else {
+          modal.classList.add("hidden");
+        }
+        return;
+      }
+
       // Check if we are on the game screen and no modal or banner is open
       const gameHidden = $("#game").classList.contains("hidden");
       const modalHidden = $("#modal").classList.contains("hidden");
@@ -2288,6 +2307,14 @@
 
       // Ignore inputs if user is typing in a text field
       if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) return;
+
+      // Theme toggle shortcut (K)
+      if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        applyTheme(S.theme === "colour" ? "ink" : "colour");
+        SFX.page();
+        return;
+      }
 
       const p = P();
       if (!p) return;
