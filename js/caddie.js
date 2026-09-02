@@ -449,6 +449,30 @@
       "Trailing. Safe golf won't fix this."
     ],
 
+    /* ---- hole in one ---- */
+    ace: [
+      "Hole in one! Frame that notebook immediately.",
+      "One shot. Pure arithmetic, zero drama.",
+      "A hole-in-one! The physics of this notebook have peaked.",
+      "Direct hit from the tee box. Absolutely magnificent."
+    ],
+
+    /* ---- eagle or birdie ---- */
+    birdie: [
+      "Under par! That is how you tame a seeded course.",
+      "A brilliant score. The card looks handsome.",
+      "Well under par. Save a photo of this hole.",
+      "In the cup in short order. Splendid shooting."
+    ],
+
+    /* ---- holed out ---- */
+    holed: [
+      "In the cup! On to the next challenge.",
+      "Rattled in and done. The hole is yours.",
+      "Sunk! Pencil that score in with pride.",
+      "Bottom of the cup. Pack up and move on."
+    ],
+
     /* ---- overflow: fits any situation ---- */
     general: [
       "The die is fair. It is not kind.",
